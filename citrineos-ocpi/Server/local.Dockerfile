@@ -7,8 +7,8 @@ COPY ./citrineos-core ./citrineos-core
 RUN cd ./citrineos-core && npm install && npm run build && npm pack --workspaces
 
 
-COPY ./rexharge-citrineos-ocpi ./citrineos-ocpi
-COPY ./rexharge-citrineos-ocpi/Server/tsconfig.docker.json /usr/local/apps/citrineos-ocpi/Server/tsconfig.json
+COPY ./citrineos-ocpi ./citrineos-ocpi
+COPY ./citrineos-ocpi/Server/tsconfig.docker.json /usr/local/apps/citrineos-ocpi/Server/tsconfig.json
 
 WORKDIR /usr/local/apps/citrineos-ocpi
 

@@ -6,7 +6,7 @@ services:
   citrineos-ocpi:
     build:
       context: ../../
-      dockerfile: ./rexharge-citrineos-ocpi/Server/local.Dockerfile
+      dockerfile: ./citrineos-ocpi/Server/local.Dockerfile
     environment:
       APP_NAME: "all"
       APP_ENV: "docker"
