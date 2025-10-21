@@ -16,6 +16,8 @@ services:
       APP_NAME: 'all'
       APP_ENV: 'docker'
       DB_HOST: ${DOCKER_DATABASE_HOST}
+      DB_USER: ${DOCKER_DATABASE_USERNAME}
+      DB_PASS: ${DOCKER_DATABASE_PASSWORD}
       AMQP_URL: ${DOCKER_RABBITMQ_URL}
       AMQP_EXCHANGE: 'citrineos'
     networks:
