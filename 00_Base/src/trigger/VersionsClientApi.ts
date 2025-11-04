@@ -9,7 +9,10 @@ import {
   VersionDetailsResponseDTO,
   VersionDetailsResponseDTOSchema,
 } from '../model/DTO/VersionDetailsResponseDTO';
-import { VersionListResponseDTO } from '../model/DTO/VersionListResponseDTO';
+import {
+  VersionListResponseDTO,
+  VersionListResponseDTOSchema,
+} from '../model/DTO/VersionListResponseDTO';
 import { HttpMethod, OCPIRegistration } from '@citrineos/base';
 import { VersionsInterface } from '../model/EndpointIdentifier';
 
@@ -44,7 +47,7 @@ export class VersionsClientApi extends BaseClientApi {
         toCountryCode,
         toPartyId,
         HttpMethod.Get,
-        VersionDetailsResponseDTOSchema,
+        VersionListResponseDTOSchema,
         partnerProfile,
         false,
         url,

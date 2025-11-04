@@ -93,14 +93,14 @@ export abstract class BaseClientApi {
     const headers: IHeaders = {};
     headers[OcpiHttpHeader.XRequestId] = uuidv4();
     headers[OcpiHttpHeader.XCorrelationId] = uuidv4();
-    const token = partnerProfile.serverCredentials.token;
+    const token = partnerProfile.credentials?.token;
     if (!token) {
       throw new MissingRequiredParamException(
         'token',
         `TenantPartner missing server token: ${JSON.stringify(partnerProfile)}`,
       );
     }
-    headers[HttpHeader.Authorization] = `Token ${base64Encode(token)}`;
+    headers[HttpHeader.Authorization] = `Token ${token}`;
     return headers;
   }
 
@@ -344,8 +344,13 @@ export abstract class BaseClientApi {
         }
       }
 
+      try {
+        return schema.parse(result);
+      } catch (e) {
+        this.logger.error('Error during response handling:', result);
+        throw e;
+      }
       // Parse and validate using Zod
-      return schema.parse(result);
     } else {
       throw new UnsuccessfulRequestException(
         'Request did not return a successful status code',

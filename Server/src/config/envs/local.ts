@@ -47,8 +47,8 @@ export function createLocalOcpiConfig(): OcpiConfigInput {
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432'),
       database: process.env.DB_NAME || 'citrine',
-      username: process.env.DB_USER || 'citrine',
-      password: process.env.DB_PASS || 'citrine',
+      username: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASS || 'postgres',
     },
 
     cache: {
@@ -58,6 +58,9 @@ export function createLocalOcpiConfig(): OcpiConfigInput {
     graphql: {
       endpoint:
         process.env.GRAPHQL_ENDPOINT || 'http://localhost:8090/v1/graphql',
+      headers: {
+        'x-hasura-access-key': 'CitrineOS!',
+      },
     },
 
     commands: {

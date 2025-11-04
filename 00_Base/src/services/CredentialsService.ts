@@ -193,7 +193,7 @@ export class CredentialsService {
       clientPartyId: partnerRole.party_id,
     });
     let tenantPartner = response.TenantPartners[0] as ITenantPartnerDto;
-    if (tenantPartner.partnerProfileOCPI?.credentials) {
+    if (tenantPartner.partnerProfileOCPI?.serverCredentials) {
       throw new AlreadyRegisteredException();
     }
     if (

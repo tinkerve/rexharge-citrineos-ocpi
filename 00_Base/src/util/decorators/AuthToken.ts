@@ -15,7 +15,8 @@ export function extractToken(authorization: string): string {
 
     try {
       // Decode the base64 token
-      return base64Decode(token);
+      // return base64Decode(token);
+      return token;
     } catch (_error) {
       throw new BadRequestError('Invalid base64 token');
     }

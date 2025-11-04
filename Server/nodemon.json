@@ -13,10 +13,11 @@
     "../../citrineos-ocpi/03_Modules/DtoRouter"
   ],
   "ext": "ts,js",
-  "ignore": ["**/dist/**", "**/node_modules/**"],
-  "execMap": {
-    "ts": "./restart.sh"
-  },
-  "exec": "./restart.sh",
-  "verbose": true
+  "ignore": [
+    "**/dist/**",
+    "**/node_modules/**"
+  ],
+  "exec": "bash ./restart.sh",
+  "verbose": true,
+  "delay": "500"
 }

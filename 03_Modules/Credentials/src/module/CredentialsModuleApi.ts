@@ -6,7 +6,6 @@ import {
   AdminCredentialsRequestDTO,
   AdminCredentialsRequestDTOSchema,
   AdminCredentialsRequestDTOSchemaName,
-  AsAdminEndpoint,
   AsOcpiRegistrationEndpoint,
   AuthToken,
   BaseController,
@@ -44,6 +43,7 @@ import {
   Get,
   JsonController,
   OnUndefined,
+  QueryParam,
   Param,
   Post,
   Put,
@@ -180,7 +180,7 @@ export class CredentialsModuleApi
    * and register token B and C.
    */
   @Post('/register-credentials-token-a')
-  @AsAdminEndpoint()
+  // @AsAdminEndpoint()
   @ResponseSchema(CredentialsResponseSchema, CredentialsResponseSchemaName, {
     statusCode: HttpStatus.OK,
     description: 'Successful response',
@@ -193,9 +193,9 @@ export class CredentialsModuleApi
   })
   async registerCredentialsTokenA(
     @VersionNumberParam() versionNumber: VersionNumber,
-    @Param('versionUrl') versionUrl: string, // CPO version url
-    @Param('cpoCountryCode') cpoCountryCode: string,
-    @Param('cpoPartyId') cpoPartyId: string,
+    @QueryParam('versionUrl') versionUrl: string, // CPO version url
+    @QueryParam('cpoCountryCode') cpoCountryCode: string,
+    @QueryParam('cpoPartyId') cpoPartyId: string,
     @BodyWithSchema(CredentialsDTOSchema, CredentialsDTOSchemaName)
     credentials: CredentialsDTO, // Partner credentials
   ): Promise<CredentialsResponse> {
@@ -212,7 +212,7 @@ export class CredentialsModuleApi
   }
 
   @Delete('/delete-tenant/:tenantId')
-  @AsAdminEndpoint()
+  // @AsAdminEndpoint()
   @ResponseSchema(OcpiEmptyResponseSchema, OcpiEmptyResponseSchemaName, {
     description: 'Successful response',
     examples: {
@@ -234,7 +234,7 @@ export class CredentialsModuleApi
 
   @Delete('/unregister-client')
   @OnUndefined(HttpStatus.NO_CONTENT)
-  @AsAdminEndpoint()
+  // @AsAdminEndpoint()
   async unregisterClient(
     @VersionNumberParam() versionNumber: VersionNumber,
     @BodyWithSchema(
@@ -256,7 +256,7 @@ export class CredentialsModuleApi
    * @param credentialsRequest AdminCredentialsRequestDTO including version url and server credentials roles
    */
   @Post('/generate-credentials-token-a')
-  @AsAdminEndpoint()
+  // @AsAdminEndpoint()
   @ResponseSchema(CredentialsResponseSchema, CredentialsResponseSchemaName, {
     statusCode: HttpStatus.OK,
     description: 'Successful response',
@@ -287,7 +287,7 @@ export class CredentialsModuleApi
   }
 
   @Put('/regenerate-credentials-token')
-  @AsAdminEndpoint()
+  // @AsAdminEndpoint()
   @ResponseSchema(CredentialsResponseSchema, CredentialsResponseSchemaName, {
     statusCode: HttpStatus.OK,
     description: 'Successful response',
