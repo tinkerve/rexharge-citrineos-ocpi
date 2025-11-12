@@ -1,8 +1,6 @@
 services:
   citrineos-ocpi:
-    build:
-      context: ../
-      dockerfile: ./Server/deploy.Dockerfile
+    image: ghcr.io/tinkerve/rexharge-citrineos-ocpi:latest
     deploy:
       labels:
         # HTTP API Swagger UI
