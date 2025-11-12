@@ -9,7 +9,7 @@ services:
         - traefik.http.routers.citrine-ocpi.entrypoints=websecure
         - traefik.http.routers.citrine-ocpi.rule=Host(`citrine-ocpi.staging-app.rexharge.net`)
         - traefik.http.routers.citrine-ocpi.tls.certresolver=leresolver
-        - traefik.http.services.citrine-ocpi.loadbalancer.server.port=8080
+        - traefik.http.services.citrine-ocpi.loadbalancer.server.port=8085
     environment:
       APP_NAME: 'all'
       APP_ENV: 'docker'
