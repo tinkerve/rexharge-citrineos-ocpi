@@ -11,8 +11,8 @@ import { HttpHeader } from '@citrineos/base';
 import { OcpiExceptionHandler } from '../middleware/OcpiExceptionHandler';
 
 export const uniqueMessageIdHeaders = {
-  [OcpiHttpHeader.XRequestId]: { required: true },
-  [OcpiHttpHeader.XCorrelationId]: { required: true },
+  [OcpiHttpHeader.XRequestId]: { required: false },
+  [OcpiHttpHeader.XCorrelationId]: { required: false },
 };
 
 /**
