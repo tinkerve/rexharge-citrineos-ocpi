@@ -80,6 +80,7 @@ export class AuthMiddleware
         if (!tenantPartner) {
           logger.debug(
             `Authorization failed - tenant partner not found for token`,
+            token,
           );
           throw new UnauthorizedException(
             'Credentials not found for given token',
