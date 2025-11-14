@@ -63,9 +63,11 @@ export function createDockerOcpiConfig(): OcpiConfigInput {
     },
 
     graphql: {
-      endpoint: 'http://graphql-engine:8080/v1/graphql',
+      endpoint:
+        process.env.HASURA_GRAPHQL_ENDPOINT || 'http://hasura:8080/v1/graphql',
       headers: {
-        'x-hasura-access-key': 'CitrineOS!',
+        'x-hasura-access-key':
+          process.env.HASURA_GRAPHQL_ADMIN_SECRET || 'CitrineOS!',
       },
     },
 

@@ -17,6 +17,8 @@ services:
       DB_USER: ${DOCKER_DATABASE_USERNAME}
       DB_PASS: ${DOCKER_DATABASE_PASSWORD}
       AMQP_URL: ${DOCKER_RABBITMQ_URL}
+      HASURA_GRAPHQL_ENDPOINT: ${DOCKER_HASURA_GRAPHQL_ENDPOINT}
+      HASURA_GRAPHQL_ADMIN_SECRET: ${DOCKER_HASURA_GRAPHQL_ADMIN_SECRET}
       AMQP_EXCHANGE: 'citrineos'
     networks:
       - rexharge_network
@@ -27,4 +29,3 @@ networks:
     external: true
   traefik_proxy:
     external: true
-
