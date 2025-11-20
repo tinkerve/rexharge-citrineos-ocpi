@@ -182,20 +182,28 @@ export class RegistrationMapper {
     }
   }
 
-  static toVersionNumber(value: OCPIVersionNumber): VersionNumber {
-    switch (value) {
-      case OCPIVersionNumber.OCPI2_2_1:
-        return VersionNumber.TWO_DOT_TWO_DOT_ONE;
-    }
+  // static toVersionNumber(value: OCPIVersionNumber): VersionNumber {
+  //   switch (value) {
+  //     case OCPIVersionNumber.OCPI2_2_1:
+  //       return VersionNumber.TWO_DOT_TWO_DOT_ONE;
+  //   }
+  // }
+
+  // static toOCPIVersionNumber(value: VersionNumber): OCPIVersionNumber {
+  //   switch (value) {
+  //     case VersionNumber.TWO_DOT_TWO_DOT_ONE:
+  //       return OCPIVersionNumber.OCPI2_2_1;
+  //     default:
+  //       throw new Error(`Unsupported version ${value}`);
+  //   }
+  // }
+
+  static toVersionNumber(value: any): any {
+    return value;
   }
 
-  static toOCPIVersionNumber(value: VersionNumber): OCPIVersionNumber {
-    switch (value) {
-      case VersionNumber.TWO_DOT_TWO_DOT_ONE:
-        return OCPIVersionNumber.OCPI2_2_1;
-      default:
-        throw new Error(`Unsupported version ${value}`);
-    }
+  static toOCPIVersionNumber(value: any): any {
+    return value;
   }
 
   static toEndpoint(value: Endpoint): OCPIRegistration.Endpoint {
@@ -259,7 +267,10 @@ export class RegistrationMapper {
     );
   }
 
-  static toModuleAndRole(value: OCPIRegistration.Endpoint): { identifier: ModuleId, role: InterfaceRole } {
+  static toModuleAndRole(value: OCPIRegistration.Endpoint): {
+    identifier: ModuleId;
+    role: InterfaceRole;
+  } {
     switch (value.identifier) {
       case EndpointIdentifier.CREDENTIALS:
         return { identifier: ModuleId.Credentials, role: InterfaceRole.SENDER };
@@ -288,9 +299,15 @@ export class RegistrationMapper {
       case EndpointIdentifier.COMMANDS_RECEIVER:
         return { identifier: ModuleId.Commands, role: InterfaceRole.RECEIVER };
       case EndpointIdentifier.CHARGING_PROFILES_SENDER:
-        return { identifier: ModuleId.ChargingProfiles, role: InterfaceRole.SENDER };
+        return {
+          identifier: ModuleId.ChargingProfiles,
+          role: InterfaceRole.SENDER,
+        };
       case EndpointIdentifier.CHARGING_PROFILES_RECEIVER:
-        return { identifier: ModuleId.ChargingProfiles, role: InterfaceRole.RECEIVER };
+        return {
+          identifier: ModuleId.ChargingProfiles,
+          role: InterfaceRole.RECEIVER,
+        };
       default:
         throw new Error(`Unknown endpoint identifier: ${value.identifier}`);
     }
