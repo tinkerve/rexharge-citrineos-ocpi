@@ -93,8 +93,8 @@ export abstract class BaseClientApi {
     const headers: IHeaders = {};
     headers[OcpiHttpHeader.XRequestId] = uuidv4();
     headers[OcpiHttpHeader.XCorrelationId] = uuidv4();
-    const token = partnerProfile.serverCredentials.token;
-    const authToken = (partnerProfile as any).authMethod ?? 'raw';
+    const token = partnerProfile.credentials?.token;
+    const authToken = (partnerProfile as any)?.authMethod ?? 'raw';
 
     if (!token) {
       throw new MissingRequiredParamException(
