@@ -8,17 +8,45 @@ import { base64Decode } from '../Util';
 
 const tokenPrefix = 'Token ';
 
-export function extractToken(authorization: string): string {
+/**
+ * Extracts and attempts to decode the token from the Authorization header.
+ * Supports both Base64-encoded tokens (OCPI 2.2-d2+) and plain tokens (OCPI 2.1.1/2.2).
+ *
+ * @param authorization - The Authorization header value
+ * @param tryBothEncodings - If true, returns an array with both decoded and raw token for database lookup
+ * @returns The extracted token(s)
+ */
+export function extractToken(
+  authorization: string,
+  tryBothEncodings = false,
+): string | string[] {
   let token = authorization;
   if (token.startsWith(tokenPrefix)) {
     token = authorization.slice(tokenPrefix.length).trim();
 
-    try {
-      // Decode the base64 token
-      return base64Decode(token);
-    } catch (_error) {
-      throw new BadRequestError('Invalid base64 token');
+    if (tryBothEncodings) {
+      // Return both decoded and raw token for database lookup
+      try {
+        const decoded = base64Decode(token);
+        // Return both: decoded first (OCPI 2.2-d2+), then raw (OCPI 2.1.1/2.2)
+        return decoded !== token ? [decoded, token] : [token];
+      } catch (_error) {
+        // If decoding fails, just return the raw token
+        return [token];
+      }
     }
+
+    // Single token mode: try Base64 decoding, fall back to raw token
+    try {
+      const decoded = base64Decode(token);
+      if (decoded && decoded !== token && decoded.length > 0) {
+        return decoded;
+      }
+    } catch (_error) {
+      // If decoding fails, fall through to use raw token
+    }
+
+    return token;
   } else {
     throw new BadRequestError('Invalid Authorization header format');
   }

@@ -93,14 +93,21 @@ export abstract class BaseClientApi {
     const headers: IHeaders = {};
     headers[OcpiHttpHeader.XRequestId] = uuidv4();
     headers[OcpiHttpHeader.XCorrelationId] = uuidv4();
-    const token = partnerProfile.credentials?.token;
+    const token = partnerProfile.serverCredentials.token;
+    const authToken = (partnerProfile as any).authMethod ?? 'raw';
+
     if (!token) {
       throw new MissingRequiredParamException(
         'token',
         `TenantPartner missing server token: ${JSON.stringify(partnerProfile)}`,
       );
     }
-    headers[HttpHeader.Authorization] = `Token ${token}`;
+    // headers[HttpHeader.Authorization] = `Token ${base64Encode(token)}`;
+    if (authToken === 'base64') {
+      headers[HttpHeader.Authorization] = `Token ${base64Encode(token)}`;
+    } else {
+      headers[HttpHeader.Authorization] = `Token ${token}`;
+    }
     return headers;
   }
 

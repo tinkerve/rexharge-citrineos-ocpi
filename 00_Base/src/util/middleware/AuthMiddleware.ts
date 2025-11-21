@@ -69,18 +69,28 @@ export class AuthMiddleware
       }
 
       try {
-        const token = extractToken(authHeader);
+        // Extract token(s) - supports both Base64-encoded (OCPI 2.2-d2+) and plain (OCPI 2.1.1/2.2)
+        const tokens = extractToken(authHeader, true);
+        const tokenArray = Array.isArray(tokens) ? tokens : [tokens];
 
-        const response = await this.ocpiGraphqlClient.request<
-          GetTenantPartnerByServerTokenQueryResult,
-          GetTenantPartnerByServerTokenQueryVariables
-        >(GET_TENANT_PARTNER_BY_SERVER_TOKEN, { serverToken: token });
+        let tenantPartner = null;
 
-        const tenantPartner = response.TenantPartners[0];
+        // Try each token variant to find the matching tenant partner
+        for (const token of tokenArray) {
+          const response = await this.ocpiGraphqlClient.request<
+            GetTenantPartnerByServerTokenQueryResult,
+            GetTenantPartnerByServerTokenQueryVariables
+          >(GET_TENANT_PARTNER_BY_SERVER_TOKEN, { serverToken: token });
+
+          if (response.TenantPartners[0]) {
+            tenantPartner = response.TenantPartners[0];
+            break;
+          }
+        }
+
         if (!tenantPartner) {
           logger.debug(
-            `Authorization failed - tenant partner not found for token`,
-            token,
+            `Authorization failed - tenant partner not found for any token variant`,
           );
           throw new UnauthorizedException(
             'Credentials not found for given token',
