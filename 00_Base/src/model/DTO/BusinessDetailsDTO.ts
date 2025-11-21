@@ -7,7 +7,7 @@ import { ImageDTOSchema } from './ImageDTO';
 
 export const BusinessDetailsSchema = z.object({
   name: z.string().max(100),
-  website: z.string().url().nullable().optional(),
+  website: z.string().url().or(z.literal('')).nullable().optional(),
   logo: ImageDTOSchema.nullable().optional(),
 });
 
