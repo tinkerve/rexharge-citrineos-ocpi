@@ -91,6 +91,7 @@ export class AuthMiddleware
         if (!tenantPartner) {
           logger.debug(
             `Authorization failed - tenant partner not found for any token variant`,
+            tokenArray,
           );
           throw new UnauthorizedException(
             'Credentials not found for given token',
