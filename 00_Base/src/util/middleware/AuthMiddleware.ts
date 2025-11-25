@@ -88,51 +88,51 @@ export class AuthMiddleware
           }
         }
 
-        if (!tenantPartner) {
-          logger.debug(
-            `Authorization failed - tenant partner not found for any token variant`,
-            tokenArray,
-          );
-          throw new UnauthorizedException(
-            'Credentials not found for given token',
-          );
-        }
+        // if (!tenantPartner) {
+        //   logger.debug(
+        //     `Authorization failed - tenant partner not found for any token variant`,
+        //     tokenArray,
+        //   );
+        //   throw new UnauthorizedException(
+        //     'Credentials not found for given token',
+        //   );
+        // }
 
-        if (
-          !registrationModules.some((value) =>
-            (context.request.originalUrl as string).includes(value),
-          )
-        ) {
-          const fromCountryCode = this.getHeader(
-            context,
-            OcpiHttpHeader.OcpiFromCountryCode,
-          );
-          const fromPartyId = this.getHeader(
-            context,
-            OcpiHttpHeader.OcpiFromPartyId,
-          );
-          const toCountryCode = this.getHeader(
-            context,
-            OcpiHttpHeader.OcpiToCountryCode,
-          );
-          const toPartyId = this.getHeader(
-            context,
-            OcpiHttpHeader.OcpiToPartyId,
-          );
-          if (
-            tenantPartner.countryCode !== fromCountryCode ||
-            tenantPartner.partyId !== fromPartyId ||
-            tenantPartner.tenant.countryCode !== toCountryCode ||
-            tenantPartner.tenant.partyId !== toPartyId
-          ) {
-            logger.debug(
-              `String token matched tenantPartner with incorrect routing headers - ${tenantPartner.countryCode}:${fromCountryCode}, ${tenantPartner.partyId}:${fromPartyId}, ${tenantPartner.tenant.countryCode}:${toCountryCode}, ${tenantPartner.tenant.partyId}:${toPartyId}`,
-            );
-            throw new UnauthorizedException(
-              'Credentials not found for given token',
-            );
-          }
-        }
+        // if (
+        //   !registrationModules.some((value) =>
+        //     (context.request.originalUrl as string).includes(value),
+        //   )
+        // ) {
+        //   const fromCountryCode = this.getHeader(
+        //     context,
+        //     OcpiHttpHeader.OcpiFromCountryCode,
+        //   );
+        //   const fromPartyId = this.getHeader(
+        //     context,
+        //     OcpiHttpHeader.OcpiFromPartyId,
+        //   );
+        //   const toCountryCode = this.getHeader(
+        //     context,
+        //     OcpiHttpHeader.OcpiToCountryCode,
+        //   );
+        //   const toPartyId = this.getHeader(
+        //     context,
+        //     OcpiHttpHeader.OcpiToPartyId,
+        //   );
+        //   if (
+        //     tenantPartner.countryCode !== fromCountryCode ||
+        //     tenantPartner.partyId !== fromPartyId ||
+        //     tenantPartner.tenant.countryCode !== toCountryCode ||
+        //     tenantPartner.tenant.partyId !== toPartyId
+        //   ) {
+        //     logger.debug(
+        //       `String token matched tenantPartner with incorrect routing headers - ${tenantPartner.countryCode}:${fromCountryCode}, ${tenantPartner.partyId}:${fromPartyId}, ${tenantPartner.tenant.countryCode}:${toCountryCode}, ${tenantPartner.tenant.partyId}:${toPartyId}`,
+        //     );
+        //     throw new UnauthorizedException(
+        //       'Credentials not found for given token',
+        //     );
+        //   }
+        // }
 
         context.state.tenantPartner = tenantPartner;
       } catch (error: any) {
