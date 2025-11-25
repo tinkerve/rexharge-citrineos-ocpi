@@ -22,10 +22,10 @@ export const uniqueMessageIdHeaders = {
 export const AsOcpiFunctionalEndpoint = function () {
   const headers: { [key: string]: ParamOptions } = {
     [HttpHeader.Authorization]: { required: true },
-    [OcpiHttpHeader.OcpiFromCountryCode]: { required: true },
-    [OcpiHttpHeader.OcpiFromPartyId]: { required: true },
-    [OcpiHttpHeader.OcpiToCountryCode]: { required: true },
-    [OcpiHttpHeader.OcpiToPartyId]: { required: true },
+    [OcpiHttpHeader.OcpiFromCountryCode]: { required: false },
+    [OcpiHttpHeader.OcpiFromPartyId]: { required: false },
+    [OcpiHttpHeader.OcpiToCountryCode]: { required: false },
+    [OcpiHttpHeader.OcpiToPartyId]: { required: false },
     ...uniqueMessageIdHeaders,
   };
   return function (object: any, methodName: string) {
