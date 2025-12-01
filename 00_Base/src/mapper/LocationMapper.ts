@@ -46,8 +46,8 @@ export class LocationMapper {
       state: location.state,
       country: location.country,
       coordinates: {
-        longitude: location.coordinates.coordinates[0].toString(),
-        latitude: location.coordinates.coordinates[1].toString(),
+        latitude: location.coordinates.coordinates[0].toString(),
+        longitude: location.coordinates.coordinates[1].toString(),
       },
       time_zone: location.timeZone,
       evses: location.chargingPool
@@ -203,8 +203,8 @@ export class EvseMapper {
     station: IChargingStationDto,
     evse: IEvseDto,
   ): EvseDTO | undefined {
-    let connectors = evse
-      .connectors?.map(ConnectorMapper.fromGraphql)
+    let connectors = evse.connectors
+      ?.map(ConnectorMapper.fromGraphql)
       ?.filter((c) => c !== undefined);
     if (!connectors || connectors.length === 0) {
       const logger = Container.get(Logger);
@@ -220,11 +220,13 @@ export class EvseMapper {
     return {
       uid: UID_FORMAT(station.id, evse.id!),
       evse_id: evse.evseId,
-      status: connectors ? EvseMapper.mapEvseStatusFromConnectors(
-        evse.connectors!.filter((c) =>
-          connectors.some((con) => con!.id === c.id!.toString()),
-        ),
-      ) : EvseStatus.UNKNOWN,
+      status: connectors
+        ? EvseMapper.mapEvseStatusFromConnectors(
+            evse.connectors!.filter((c) =>
+              connectors.some((con) => con!.id === c.id!.toString()),
+            ),
+          )
+        : EvseStatus.UNKNOWN,
       capabilities: station.capabilities
         ?.map((c) => EvseMapper.mapEvseCapabilities(c))
         .filter((c) => c !== null),
