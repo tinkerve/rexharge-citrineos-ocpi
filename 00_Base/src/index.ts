@@ -457,3 +457,5 @@ export {
   PaginatedCdrResponseSchema,
   PaginatedCdrResponseSchemaName,
 } from './model/Cdr';
+
+export { Context } from 'koa';

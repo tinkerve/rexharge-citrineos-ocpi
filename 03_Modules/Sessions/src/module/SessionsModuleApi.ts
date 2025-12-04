@@ -27,17 +27,11 @@ import {
   ResponseSchema,
   SessionsService,
   versionIdParam,
+  Context,
 } from '@citrineos/ocpi-base';
 import { Ctx, Get, JsonController, Param, Put } from 'routing-controllers';
 
 import { Service } from 'typedi';
-
-type TenantPartner =
-  GetTenantPartnerByServerTokenQueryResult['TenantPartners'][0];
-interface Context {
-  // Supposed to be koa context but somehow it's not here
-  tenantPartner: TenantPartner;
-}
 
 const MOCK_PAGINATED_SESSIONS = generateMockOcpiPaginatedResponse(
   PaginatedSessionResponseSchema,
