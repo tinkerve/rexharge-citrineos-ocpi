@@ -27,6 +27,14 @@ import {
 const permittedRoutes: string[] = ['/docs', '/docs/spec', '/favicon.png'];
 const registrationModules: string[] = ['versions', 'credentials'];
 
+type TenantPartner =
+  GetTenantPartnerByServerTokenQueryResult['TenantPartners'][0];
+declare module 'koa' {
+  interface Context {
+    tenantPartner: TenantPartner;
+  }
+}
+
 /**
  * AuthMiddleware is applied via the {@link AsOcpiEndpoint} and {@link AsOcpiOpenRoutingEndpoint} decorators. Endpoints
  * that are annotated with these decorators will have this middleware running. The middleware will check for presense
