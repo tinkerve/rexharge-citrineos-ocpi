@@ -4,7 +4,7 @@
 
 import { ISessionsModuleApi } from './ISessionsModuleApi';
 
-import { HttpStatus } from '@citrineos/base';
+import { HttpStatus, ITenantPartnerDto } from '@citrineos/base';
 import {
   AsOcpiFunctionalEndpoint,
   BaseController,
@@ -17,7 +17,6 @@ import {
   ChargingPreferencesSchemaName,
   generateMockForSchema,
   generateMockOcpiPaginatedResponse,
-  GetTenantPartnerByServerTokenQueryResult,
   ModuleId,
   Paginated,
   PaginatedParams,
@@ -27,7 +26,6 @@ import {
   ResponseSchema,
   SessionsService,
   versionIdParam,
-  Context,
 } from '@citrineos/ocpi-base';
 import { Ctx, Get, JsonController, Param, Put } from 'routing-controllers';
 
@@ -67,15 +65,16 @@ export class SessionsModuleApi
     },
   )
   async getSessions(
-    @Ctx()
-    { tenantPartner }: Context,
+    @Ctx() ctx: any,
     @Paginated() paginatedParams?: PaginatedParams,
   ): Promise<PaginatedSessionResponse> {
+    const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
+
     return this.sessionsService.getSessions(
-      tenantPartner.countryCode,
-      tenantPartner.partyId,
-      tenantPartner.countryCode,
-      tenantPartner.partyId,
+      tenantPartner.countryCode!,
+      tenantPartner.partyId!,
+      tenantPartner.tenant!.countryCode!,
+      tenantPartner.tenant!.partyId!,
       paginatedParams?.dateFrom,
       paginatedParams?.dateTo,
       paginatedParams?.offset,

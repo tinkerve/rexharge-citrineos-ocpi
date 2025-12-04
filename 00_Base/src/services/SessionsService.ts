@@ -19,7 +19,6 @@ import {
   GetTransactionsQueryVariables,
   Transactions_Bool_Exp,
 } from '../graphql/operations';
-import { Logger } from 'tslog';
 @Service()
 export class SessionsService {
   constructor(
