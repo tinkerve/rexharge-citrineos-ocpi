@@ -4,12 +4,13 @@
 
 import { ICdrsModuleApi } from './ICdrsModuleApi';
 
-import { Get, JsonController } from 'routing-controllers';
+import { Ctx, Get, JsonController } from 'routing-controllers';
 import { HttpStatus } from '@citrineos/base';
 import {
   AsOcpiFunctionalEndpoint,
   BaseController,
   CdrsService,
+  Context,
   FunctionalEndpointParams,
   generateMockOcpiPaginatedResponse,
   ModuleId,
@@ -48,14 +49,15 @@ export class CdrsModuleApi extends BaseController implements ICdrsModuleApi {
     },
   })
   async getCdrs(
+    @Ctx()
+    { tenantPartner }: Context,
     @Paginated() paginationParams?: PaginatedParams,
-    @FunctionalEndpointParams() ocpiHeaders?: OcpiHeaders,
   ): Promise<PaginatedCdrResponse> {
     return this.cdrsService.getCdrs(
-      ocpiHeaders!.fromCountryCode,
-      ocpiHeaders!.fromPartyId,
-      ocpiHeaders!.toCountryCode,
-      ocpiHeaders!.toPartyId,
+      tenantPartner.countryCode,
+      tenantPartner.partyId,
+      tenantPartner.countryCode,
+      tenantPartner.partyId,
       paginationParams?.dateFrom,
       paginationParams?.dateTo,
       paginationParams?.offset,
