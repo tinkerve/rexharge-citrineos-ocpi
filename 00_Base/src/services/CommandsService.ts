@@ -203,6 +203,7 @@ export class CommandsService {
       GetTransactionByTransactionIdQueryResult,
       GetTransactionByTransactionIdQueryVariables
     >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
+      stationId: stopSession.station_id,
       transactionId: stopSession.session_id,
     });
     if (!transactionResponse.Transactions[0]) {
