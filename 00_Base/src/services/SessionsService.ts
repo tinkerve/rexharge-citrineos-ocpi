@@ -39,13 +39,13 @@ export class SessionsService {
   ): Promise<PaginatedSessionResponse> {
     const where: Transactions_Bool_Exp = {
       Tenant: {
-        countryCode: { _eq: fromCountryCode },
-        partyId: { _eq: fromPartyId },
+        countryCode: { _eq: toCountryCode },
+        partyId: { _eq: toPartyId },
       },
       Authorization: {
         TenantPartner: {
-          countryCode: { _eq: toCountryCode },
-          partyId: { _eq: toPartyId },
+          countryCode: { _eq: fromCountryCode },
+          partyId: { _eq: fromPartyId },
         },
       },
     };
