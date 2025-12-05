@@ -1,7 +1,3 @@
-// SPDX-FileCopyrightText: 2025 Contributors to the CitrineOS Project
-//
-// SPDX-License-Identifier: Apache-2.0
-
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
 export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
@@ -797,6 +793,11 @@ export type GetTransactionsQueryResult = {
     locationId?: number | null,
     authorizationId?: number | null,
     tariffId?: number | null,
+    tenantId: number,
+    tenant: {
+      countryCode: string,
+      partyId: string
+    },
     transactionEvents: Array<{
       id: number,
       eventType?: string | null,
