@@ -35,6 +35,11 @@ export const GET_TRANSACTIONS_QUERY = gql`
       locationId
       authorizationId
       tariffId
+      tenantId
+      tenant: Tenant {
+        countryCode
+        partyId
+      }
       transactionEvents: TransactionEvents {
         id
         eventType
