@@ -52,10 +52,10 @@ export class CdrsModuleApi extends BaseController implements ICdrsModuleApi {
     const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
 
     return this.cdrsService.getCdrs(
-      tenantPartner.countryCode!,
-      tenantPartner.partyId!,
       tenantPartner.tenant!.countryCode!,
       tenantPartner.tenant!.partyId!,
+      tenantPartner.countryCode!,
+      tenantPartner.partyId!,
       paginationParams?.dateFrom,
       paginationParams?.dateTo,
       paginationParams?.offset,

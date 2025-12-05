@@ -71,10 +71,10 @@ export class SessionsModuleApi
     const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
 
     return this.sessionsService.getSessions(
-      tenantPartner.countryCode!,
-      tenantPartner.partyId!,
       tenantPartner.tenant!.countryCode!,
       tenantPartner.tenant!.partyId!,
+      tenantPartner.countryCode!,
+      tenantPartner.partyId!,
       paginatedParams?.dateFrom,
       paginatedParams?.dateTo,
       paginatedParams?.offset,
