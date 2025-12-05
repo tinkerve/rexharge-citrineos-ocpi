@@ -16,10 +16,6 @@ export const GET_TRANSACTIONS_QUERY = gql`
       order_by: { createdAt: asc }
       where: $where
     ) {
-      tenant: Tenant {
-        countryCode
-        partyId
-      }
       id
       stationId
       transactionId
