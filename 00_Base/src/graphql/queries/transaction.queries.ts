@@ -63,8 +63,16 @@ export const GET_TRANSACTIONS_QUERY = gql`
 `;
 
 export const GET_TRANSACTION_BY_TRANSACTION_ID_QUERY = gql`
-  query GetTransactionByTransactionId($transactionId: String!) {
-    Transactions(where: { transactionId: { _eq: $transactionId } }) {
+  query GetTransactionByTransactionId(
+    $stationId: String!
+    $transactionId: String!
+  ) {
+    Transactions(
+      where: {
+        transactionId: { _eq: $transactionId }
+        stationId: { _eq: $stationId }
+      }
+    ) {
       tenant: Tenant {
         countryCode
         partyId
@@ -103,6 +111,7 @@ export const GET_TRANSACTION_BY_TRANSACTION_ID_QUERY = gql`
       }
       chargingStation: ChargingStation {
         id
+        isOnline
       }
       transactionEvents: TransactionEvents {
         id

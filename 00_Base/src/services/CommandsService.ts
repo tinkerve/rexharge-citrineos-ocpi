@@ -169,7 +169,7 @@ export class CommandsService {
     if (
       startSession.connector_id &&
       !Array.from(chargingStation.connectors || []).some(
-        (value) => value.id?.toString() === startSession.connector_id,
+        (value) => value.connectorId?.toString() === startSession.connector_id,
       )
     ) {
       this.logger.error('Connector not found for StartSession command', {
@@ -203,6 +203,7 @@ export class CommandsService {
       GetTransactionByTransactionIdQueryResult,
       GetTransactionByTransactionIdQueryVariables
     >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
+      stationId: stopSession.station_id,
       transactionId: stopSession.session_id,
     });
     if (!transactionResponse.Transactions[0]) {
