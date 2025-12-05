@@ -169,7 +169,7 @@ export class CommandsService {
     if (
       startSession.connector_id &&
       !Array.from(chargingStation.connectors || []).some(
-        (value) => value.id?.toString() === startSession.connector_id,
+        (value) => value.connectorId?.toString() === startSession.connector_id,
       )
     ) {
       this.logger.error('Connector not found for StartSession command', {
