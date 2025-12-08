@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Get, JsonController, Param } from 'routing-controllers';
+import { Ctx, Get, JsonController, Param } from 'routing-controllers';
 import { ILocationsModuleApi } from './ILocationsModuleApi';
 import {
   AsOcpiFunctionalEndpoint,
@@ -23,7 +23,6 @@ import {
   LocationResponseSchemaName,
   LocationsService,
   ModuleId,
-  OcpiHeaders,
   Paginated,
   PaginatedLocationResponse,
   PaginatedLocationResponseSchema,
@@ -35,7 +34,7 @@ import {
   VersionNumberParam,
 } from '@citrineos/ocpi-base';
 import { Service } from 'typedi';
-import { HttpStatus } from '@citrineos/base';
+import { HttpStatus, ITenantPartnerDto } from '@citrineos/base';
 
 const MOCK_PAGINATED_LOCATION = generateMockOcpiPaginatedResponse(
   PaginatedLocationResponseSchema,
@@ -92,10 +91,17 @@ export class LocationsModuleApi
   )
   async getLocations(
     @VersionNumberParam() version: VersionNumber,
-    @FunctionalEndpointParams() ocpiHeaders: OcpiHeaders,
+    @Ctx() ctx: any,
     @Paginated() paginatedParams?: PaginatedParams,
   ): Promise<PaginatedLocationResponse> {
-    return this.locationsService.getLocations(ocpiHeaders, paginatedParams);
+    const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
+    return this.locationsService.getLocations(
+      {
+        countryCode: tenantPartner.countryCode!,
+        partyId: tenantPartner.partyId!,
+      },
+      paginatedParams,
+    );
   }
 
   @Get('/:location_id')

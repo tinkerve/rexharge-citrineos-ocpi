@@ -5,7 +5,6 @@
 import { Service } from 'typedi';
 import { TariffDTO } from '../model/DTO/tariffs/TariffDTO';
 import { DEFAULT_LIMIT, DEFAULT_OFFSET } from '../model/PaginatedResponse';
-import { OcpiHeaders } from '../model/OcpiHeaders';
 import { PaginatedParams } from '../controllers/param/PaginatedParams';
 import { PutTariffRequest } from '../model/DTO/tariffs/PutTariffRequest';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
@@ -16,7 +15,7 @@ import {
   GET_TARIFFS_QUERY,
 } from '../graphql/queries/tariff.queries';
 import { TariffMapper } from '../mapper/TariffMapper';
-import { ITariffDto, ITenantDto } from '@citrineos/base';
+import { ITariffDto, ITenantDto, ITenantPartnerDto } from '@citrineos/base';
 import {
   GetTariffByKeyQueryResult,
   GetTariffByKeyQueryVariables,
@@ -46,15 +45,15 @@ export class TariffsService {
   }
 
   async getTariffs(
-    ocpiHeaders: OcpiHeaders,
+    tenant: Required<Pick<ITenantPartnerDto, 'countryCode' | 'partyId'>>,
     paginationParams?: PaginatedParams,
   ): Promise<{ data: TariffDTO[]; count: number }> {
     const limit = paginationParams?.limit ?? DEFAULT_LIMIT;
     const offset = paginationParams?.offset ?? DEFAULT_OFFSET;
     const where: Tariffs_Bool_Exp = {
       Tenant: {
-        countryCode: { _eq: ocpiHeaders.toCountryCode },
-        partyId: { _eq: ocpiHeaders.toPartyId },
+        countryCode: { _eq: tenant.countryCode },
+        partyId: { _eq: tenant.partyId },
       },
     };
     const dateFilters: any = {};
