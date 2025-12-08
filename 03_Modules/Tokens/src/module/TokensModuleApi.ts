@@ -14,7 +14,7 @@ import {
 } from 'routing-controllers';
 import { Service } from 'typedi';
 
-import { HttpStatus, ITenantDto, ITenantPartnerDto } from '@citrineos/base';
+import { HttpStatus, ITenantPartnerDto } from '@citrineos/base';
 import {
   RealTimeAuthorizationRequestBody,
   RealTimeAuthorizationResponse,
