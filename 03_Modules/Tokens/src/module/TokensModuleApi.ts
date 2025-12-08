@@ -14,7 +14,7 @@ import {
 } from 'routing-controllers';
 import { Service } from 'typedi';
 
-import { HttpStatus } from '@citrineos/base';
+import { HttpStatus, ITenantDto, ITenantPartnerDto } from '@citrineos/base';
 import {
   RealTimeAuthorizationRequestBody,
   RealTimeAuthorizationResponse,
@@ -155,7 +155,6 @@ export class TokensModuleApi
     @Param('countryCode') countryCode: string,
     @Param('partyId') partyId: string,
     @Param('tokenId') tokenId: string,
-    @FunctionalEndpointParams() ocpiHeader: OcpiHeaders,
     @BodyWithExample(TokenDTOSchema, TokenTypeSchemaName) tokenDTO: TokenDTO,
     @EnumQueryParam('type', TokenTypeSchema, TokenTypeSchemaName)
     type?: TokenType,
@@ -163,9 +162,18 @@ export class TokensModuleApi
   ): Promise<OcpiEmptyResponse> {
     this.logger.info('putToken', countryCode, partyId, tokenId, tokenDTO, type);
 
+    const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
+
     if (
-      ocpiHeader.fromCountryCode !== countryCode ||
-      ocpiHeader.fromPartyId !== partyId
+      tenantPartner?.tenant?.id === undefined ||
+      tenantPartner?.id === undefined
+    ) {
+      throw new InvalidParamException('Tenant information not available');
+    }
+
+    if (
+      tenantPartner.countryCode !== countryCode ||
+      tenantPartner.partyId !== partyId
     ) {
       throw new WrongClientAccessException(
         'Client is trying to access wrong resource',
@@ -178,14 +186,11 @@ export class TokensModuleApi
       );
     }
 
-    const tenantId = ctx?.state?.tenantPartner?.tenant?.id;
-    const tenantPartnerId = ctx?.state?.tenantPartner?.id;
-
-    if (tenantId === undefined || tenantPartnerId === undefined) {
-      throw new InvalidParamException('Tenant information not available');
-    }
-
-    await this.tokensService.upsertToken(tokenDTO, tenantId, tenantPartnerId);
+    await this.tokensService.upsertToken(
+      tokenDTO,
+      tenantPartner.tenant.id,
+      tenantPartner.id!,
+    );
 
     return buildOcpiEmptyResponse(OcpiResponseStatusCode.GenericSuccessCode);
   }
