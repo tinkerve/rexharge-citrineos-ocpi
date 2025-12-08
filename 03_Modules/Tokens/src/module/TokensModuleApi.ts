@@ -28,14 +28,12 @@ import {
   buildOcpiEmptyResponse,
   buildOcpiResponse,
   EnumQueryParam,
-  FunctionalEndpointParams,
   generateMockForSchema,
   InvalidParamException,
   ModuleId,
   OcpiEmptyResponse,
   OcpiEmptyResponseSchema,
   OcpiEmptyResponseSchemaName,
-  OcpiHeaders,
   OcpiResponseStatusCode,
   ResponseSchema,
   SingleTokenRequest,
@@ -109,14 +107,16 @@ export class TokensModuleApi
     @Param('countryCode') countryCode: string,
     @Param('partyId') partyId: string,
     @Param('tokenId') tokenId: string,
-    @FunctionalEndpointParams() ocpiHeader: OcpiHeaders,
+    @Ctx() ctx?: any,
     @EnumQueryParam('type', TokenTypeSchema, TokenTypeSchemaName)
     type?: TokenType,
   ): Promise<TokenResponse | OcpiEmptyResponse> {
     this.logger.info('getTokens', countryCode, partyId, tokenId, type);
+    const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
+
     if (
-      ocpiHeader.fromCountryCode !== countryCode ||
-      ocpiHeader.fromPartyId !== partyId
+      tenantPartner?.countryCode !== countryCode ||
+      tenantPartner?.partyId !== partyId
     ) {
       throw new WrongClientAccessException(
         'Client is trying to access wrong resource',
@@ -212,7 +212,6 @@ export class TokensModuleApi
     @Param('countryCode') countryCode: string,
     @Param('partyId') partyId: string,
     @Param('tokenUid') tokenUid: string,
-    @FunctionalEndpointParams() ocpiHeader: OcpiHeaders,
     @BodyWithSchema(TokenDTOSchema, TokenDTOSchemaName)
     token: Partial<TokenDTO>,
     @EnumQueryParam('type', TokenTypeSchema, TokenTypeSchemaName)
@@ -220,9 +219,12 @@ export class TokensModuleApi
     @Ctx() ctx?: any,
   ): Promise<OcpiEmptyResponse> {
     this.logger.info('patchToken', countryCode, partyId, tokenUid, token, type);
+
+    const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
+
     if (
-      ocpiHeader.fromCountryCode !== countryCode ||
-      ocpiHeader.fromPartyId !== partyId
+      tenantPartner?.countryCode !== countryCode ||
+      tenantPartner?.partyId !== partyId
     ) {
       throw new WrongClientAccessException(
         'Client is trying to access wrong resource',
