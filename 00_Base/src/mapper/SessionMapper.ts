@@ -322,7 +322,7 @@ export class SessionMapper extends BaseTransactionMapper {
     return {
       country_code: location.country_code,
       party_id: location.party_id,
-      id: `CDR**REX**${transaction.id!.toString().padStart(6, '0')}`,
+      id: transaction.id!.toString(),
       start_date_time: transaction.startTime
         ? new Date(transaction.startTime)
         : (() => {
@@ -442,6 +442,7 @@ export class SessionMapper extends BaseTransactionMapper {
             });
           }
           break;
+        // TODO: dimension is here
         case OCPP2_0_1.MeasurandEnumType.Energy_Active_Import_Register:
           if (!sampledValue.phase) {
             cdrDimensions.push({
