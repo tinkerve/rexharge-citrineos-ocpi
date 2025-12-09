@@ -7,7 +7,7 @@ import { ResponseUrlSchema } from './ResponseUrl';
 
 export const StopSessionSchema = ResponseUrlSchema.extend({
   // session_id: z.string().max(36).min(1),
-  session_id: z.number(),
+  session_id: z.string().max(36).min(1),
 });
 export const StopSessionSchemaName = 'StopSession';
 
