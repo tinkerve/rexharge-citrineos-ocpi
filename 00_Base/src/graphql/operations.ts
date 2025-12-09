@@ -820,8 +820,7 @@ export type GetTransactionsQueryResult = {
 };
 
 export type GetTransactionByTransactionIdQueryVariables = Exact<{
-  stationId: Scalars['String']['input'];
-  transactionId: Scalars['String']['input'];
+  transactionId: Scalars['Int']['input'];
 }>;
 
 
