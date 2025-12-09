@@ -322,7 +322,7 @@ export class SessionMapper extends BaseTransactionMapper {
     return {
       country_code: location.country_code,
       party_id: location.party_id,
-      id: transaction.transactionId!,
+      id: `CDR**REX**${transaction.id!.toString().padStart(6, '0')}`,
       start_date_time: transaction.startTime
         ? new Date(transaction.startTime)
         : (() => {
