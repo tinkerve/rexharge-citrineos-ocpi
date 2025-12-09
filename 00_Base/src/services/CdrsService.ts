@@ -8,7 +8,6 @@ import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import { CdrMapper } from '../mapper/CdrMapper';
 import { GET_TRANSACTIONS_QUERY } from '../graphql/queries/transaction.queries';
 import { ITransactionDto } from '@citrineos/base';
-import { PaginatedCdrResponse } from '../model/Cdr';
 import {
   GetTransactionsQueryResult,
   GetTransactionsQueryVariables,
@@ -31,7 +30,7 @@ export class CdrsService {
     dateTo?: Date,
     offset: number = DEFAULT_OFFSET,
     limit: number = DEFAULT_LIMIT,
-  ): Promise<PaginatedCdrResponse> {
+  ) {
     const where: Transactions_Bool_Exp = {
       Tenant: {
         countryCode: { _eq: toCountryCode },
@@ -68,6 +67,6 @@ export class CdrsService {
       total: result.Transactions.length,
       offset: offset,
       limit: limit,
-    } as PaginatedCdrResponse;
+    };
   }
 }

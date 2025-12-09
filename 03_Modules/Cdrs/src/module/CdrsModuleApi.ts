@@ -11,6 +11,7 @@ import {
   CdrsService,
   generateMockOcpiPaginatedResponse,
   ModuleId,
+  OcpiResponseStatusCode,
   Paginated,
   PaginatedCdrResponse,
   PaginatedCdrResponseSchema,
@@ -50,8 +51,7 @@ export class CdrsModuleApi extends BaseController implements ICdrsModuleApi {
     @Paginated() paginationParams?: PaginatedParams,
   ): Promise<PaginatedCdrResponse> {
     const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
-
-    return this.cdrsService.getCdrs(
+    const cdrs = await this.cdrsService.getCdrs(
       tenantPartner.countryCode!,
       tenantPartner.partyId!,
       tenantPartner.tenant!.countryCode!,
@@ -61,5 +61,11 @@ export class CdrsModuleApi extends BaseController implements ICdrsModuleApi {
       paginationParams?.offset,
       paginationParams?.limit,
     );
+
+    return {
+      timestamp: new Date(),
+      status_code: OcpiResponseStatusCode.GenericSuccessCode,
+      ...cdrs,
+    };
   }
 }

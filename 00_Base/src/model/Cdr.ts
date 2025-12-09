@@ -63,7 +63,7 @@ export const PaginatedCdrResponseSchema = z.object({
   total: z.number().int().nonnegative(),
   offset: z.number().int().nonnegative(),
   limit: z.number().int().min(0).max(200),
-  link: z.string(),
+  // link: z.string(),
   data: z.array(CdrSchema),
 });
 
