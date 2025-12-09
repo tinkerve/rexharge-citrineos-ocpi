@@ -62,6 +62,8 @@ export class CdrsModuleApi extends BaseController implements ICdrsModuleApi {
       paginationParams?.limit,
     );
 
+    // TODO: need to append to header
+
     return {
       timestamp: new Date(),
       status_code: OcpiResponseStatusCode.GenericSuccessCode,
