@@ -80,13 +80,15 @@ export class TariffsModuleApi
     @Ctx() ctx: any,
     @Paginated() paginationParams?: PaginatedParams,
   ): Promise<PaginatedTariffResponse> {
-    const tenantPartner = ctx!.state!
-      .tenantPartner as Required<ITenantPartnerDto>;
+    const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
     console.log(
       `GET /tariffs ${JSON.stringify(paginationParams)}, ${JSON.stringify(tenantPartner)}`,
     );
     const { data, count } = await this.tariffService.getTariffs(
-      tenantPartner,
+      {
+        countryCode: tenantPartner.tenant!.countryCode!,
+        partyId: tenantPartner.tenant!.partyId!,
+      },
       paginationParams,
     );
 

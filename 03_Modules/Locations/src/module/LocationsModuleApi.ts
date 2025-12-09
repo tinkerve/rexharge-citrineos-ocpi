@@ -97,8 +97,8 @@ export class LocationsModuleApi
     const tenantPartner = ctx!.state!.tenantPartner as ITenantPartnerDto;
     return this.locationsService.getLocations(
       {
-        countryCode: tenantPartner.countryCode!,
-        partyId: tenantPartner.partyId!,
+        countryCode: tenantPartner.tenant!.countryCode!,
+        partyId: tenantPartner.tenant!.partyId!,
       },
       paginatedParams,
     );
