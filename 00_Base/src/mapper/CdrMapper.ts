@@ -133,7 +133,7 @@ export class CdrMapper extends BaseTransactionMapper {
   }
 
   private generateCdrId(session: Session): string {
-    return session.id;
+    return `CDR**REX**${session.id.padStart(5, '0')}`;
   }
 
   private async createCdrLocation(

@@ -21,7 +21,6 @@ import {
   OcpiResponseStatusCode,
 } from '../model/OcpiResponse';
 import { buildOcpiErrorResponse } from '../model/OcpiErrorResponse';
-import { OcpiHeaders } from '../model/OcpiHeaders';
 import { NotFoundException } from '../exception/NotFoundException';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import {
@@ -51,6 +50,7 @@ import {
   IConnectorDto,
   IEvseDto,
   ILocationDto,
+  ITenantPartnerDto,
 } from '@citrineos/base';
 
 @Service()
@@ -65,18 +65,18 @@ export class LocationsService {
    */
 
   async getLocations(
-    ocpiHeaders: OcpiHeaders,
+    tenant: Required<Pick<ITenantPartnerDto, 'countryCode' | 'partyId'>>,
     paginatedParams?: PaginatedParams,
   ): Promise<PaginatedLocationResponse> {
     this.logger.debug(
-      `Getting all locations with headers ${JSON.stringify(ocpiHeaders)} and parameters ${JSON.stringify(paginatedParams)}`,
+      `Getting all locations for ${JSON.stringify(tenant)} and parameters ${JSON.stringify(paginatedParams)}`,
     );
     const limit = paginatedParams?.limit ?? DEFAULT_LIMIT;
     const offset = paginatedParams?.offset ?? DEFAULT_OFFSET;
     const where: Locations_Bool_Exp = {
       Tenant: {
-        countryCode: { _eq: ocpiHeaders.toCountryCode },
-        partyId: { _eq: ocpiHeaders.toPartyId },
+        countryCode: { _eq: tenant.countryCode },
+        partyId: { _eq: tenant.partyId },
       },
     };
     const dateFilters: any = {};

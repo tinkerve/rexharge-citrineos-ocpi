@@ -4,9 +4,16 @@
 
 import { ITariffsModuleApi } from './ITariffsModuleApi';
 
-import { Delete, Get, JsonController, Param, Put } from 'routing-controllers';
+import {
+  Ctx,
+  Delete,
+  Get,
+  JsonController,
+  Param,
+  Put,
+} from 'routing-controllers';
 
-import { HttpStatus } from '@citrineos/base';
+import { HttpStatus, ITenantPartnerDto } from '@citrineos/base';
 import {
   AsOcpiFunctionalEndpoint,
   BaseController,
@@ -20,7 +27,6 @@ import {
   ModuleId,
   OcpiEmptyResponse,
   OcpiErrorResponse,
-  OcpiHeaders,
   OcpiResponseStatusCode,
   Paginated,
   PaginatedParams,
@@ -71,14 +77,16 @@ export class TariffsModuleApi
   )
   async getTariffs(
     @VersionNumberParam() version: VersionNumber,
-    @FunctionalEndpointParams() ocpiHeaders: OcpiHeaders,
+    @Ctx() ctx: any,
     @Paginated() paginationParams?: PaginatedParams,
   ): Promise<PaginatedTariffResponse> {
+    const tenantPartner = ctx!.state!
+      .tenantPartner as Required<ITenantPartnerDto>;
     console.log(
-      `GET /tariffs ${JSON.stringify(paginationParams)}, ${JSON.stringify(ocpiHeaders)}`,
+      `GET /tariffs ${JSON.stringify(paginationParams)}, ${JSON.stringify(tenantPartner)}`,
     );
     const { data, count } = await this.tariffService.getTariffs(
-      ocpiHeaders,
+      tenantPartner,
       paginationParams,
     );
 
