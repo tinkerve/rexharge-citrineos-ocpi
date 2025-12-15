@@ -60,6 +60,7 @@ export class CredentialsClientApi extends BaseClientApi {
     toPartyId: string,
     partnerProfile: OCPIRegistration.PartnerProfile,
     body: CredentialsDTO,
+    overrideToken?: string,
   ): Promise<CredentialsResponse> {
     return this.request(
       fromCountryCode,
@@ -72,6 +73,10 @@ export class CredentialsClientApi extends BaseClientApi {
       false,
       undefined,
       body,
+      undefined,
+      undefined,
+      undefined,
+      overrideToken,
     );
   }
 
@@ -82,6 +87,7 @@ export class CredentialsClientApi extends BaseClientApi {
     toPartyId: string,
     partnerProfile: OCPIRegistration.PartnerProfile,
     body: CredentialsDTO,
+    overrideToken?: string,
   ): Promise<CredentialsResponse> {
     return this.request(
       fromCountryCode,
@@ -94,6 +100,10 @@ export class CredentialsClientApi extends BaseClientApi {
       false,
       undefined,
       body,
+      undefined,
+      undefined,
+      undefined,
+      overrideToken,
     );
   }
 

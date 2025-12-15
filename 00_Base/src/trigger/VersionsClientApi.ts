@@ -39,6 +39,7 @@ export class VersionsClientApi extends BaseClientApi {
     toPartyId: string,
     partnerProfile: OCPIRegistration.PartnerProfile,
     url?: string,
+    overrideToken?: string,
   ): Promise<VersionListResponseDTO> {
     try {
       return this.request(
@@ -51,6 +52,11 @@ export class VersionsClientApi extends BaseClientApi {
         partnerProfile,
         false,
         url,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        overrideToken,
       );
     } catch (e: any) {
       throw new UnsuccessfulRequestException(
@@ -66,6 +72,7 @@ export class VersionsClientApi extends BaseClientApi {
     toPartyId: string,
     partnerProfile: OCPIRegistration.PartnerProfile,
     url?: string,
+    overrideToken?: string,
   ): Promise<VersionDetailsResponseDTO> {
     try {
       url = url || this.getUrl(partnerProfile, VersionsInterface.DETAILS);
@@ -79,6 +86,11 @@ export class VersionsClientApi extends BaseClientApi {
         partnerProfile,
         false,
         url,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        overrideToken,
       );
     } catch (e: any) {
       throw new UnsuccessfulRequestException(

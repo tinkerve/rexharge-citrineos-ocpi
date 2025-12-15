@@ -89,11 +89,12 @@ export abstract class BaseClientApi {
 
   protected getHeaders(
     partnerProfile: OCPIRegistration.PartnerProfile,
+    overrideToken?: string,
   ): IHeaders {
     const headers: IHeaders = {};
     headers[OcpiHttpHeader.XRequestId] = uuidv4();
     headers[OcpiHttpHeader.XCorrelationId] = uuidv4();
-    const token = partnerProfile.credentials?.token;
+    const token = overrideToken ?? partnerProfile.credentials?.token;
     const authToken = (partnerProfile as any)?.authMethod ?? 'raw';
 
     if (!token) {
@@ -125,6 +126,7 @@ export abstract class BaseClientApi {
     paginatedParams?: PaginatedParams,
     otherParams?: Record<string, string | number | (string | number)[]>,
     path?: string,
+    overrideToken?: string,
   ): Promise<any> {
     if (!partnerProfile) {
       const response = await this.ocpiGraphqlClient.request<
@@ -145,7 +147,7 @@ export abstract class BaseClientApi {
     if (path) {
       url += path;
     }
-    const additionalHeaders = this.getHeaders(partnerProfile);
+    const additionalHeaders = this.getHeaders(partnerProfile, overrideToken);
     if (routingHeaders) {
       additionalHeaders[OcpiHttpHeader.OcpiFromCountryCode] = fromCountryCode;
       additionalHeaders[OcpiHttpHeader.OcpiFromPartyId] = fromPartyId;

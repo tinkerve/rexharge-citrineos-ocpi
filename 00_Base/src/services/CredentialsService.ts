@@ -108,6 +108,7 @@ export class CredentialsService {
     const tenantPartner = await this.getVersionDetails(
       partner,
       credentials.url,
+      credentials.token,
     );
 
     const newServerToken = uuidv4();
@@ -214,7 +215,11 @@ export class CredentialsService {
       (value: CredentialsRoleDTO) =>
         RegistrationMapper.toCredentialsRole(value),
     );
-    tenantPartner = await this.getVersionDetails(tenantPartner, url);
+    tenantPartner = await this.getVersionDetails(
+      tenantPartner,
+      url,
+      credentialsTokenA,
+    );
 
     const credentialsTokenB = uuidv4();
     tenantPartner.partnerProfileOCPI!.serverCredentials = {
@@ -237,6 +242,7 @@ export class CredentialsService {
       tenantPartner.partyId!,
       tenantPartner.partnerProfileOCPI!,
       RegistrationMapper.tenantPartnerToCredentialsDto(tenantPartner),
+      credentialsTokenA,
     );
     return credentialsResponse.data as CredentialsDTO;
   }
@@ -282,6 +288,7 @@ export class CredentialsService {
           credentialsRequest.mspPartyId,
           tenantPartner.partnerProfileOCPI!,
           newCredentialsDto,
+          tenantPartner.partnerProfileOCPI!.serverCredentials.token,
         );
 
       tenantPartner.partnerProfileOCPI!.credentials = {
@@ -313,6 +320,7 @@ export class CredentialsService {
   private async getVersionDetails(
     tenantPartner: ITenantPartnerDto,
     versionsUrl?: string,
+    overrideToken?: string,
   ): Promise<ITenantPartnerDto> {
     const versions = await this.versionsClientApi.getVersions(
       tenantPartner.tenant!.countryCode!,
@@ -321,6 +329,7 @@ export class CredentialsService {
       tenantPartner.partyId!,
       tenantPartner.partnerProfileOCPI!,
       versionsUrl,
+      overrideToken,
     );
     if (!versions?.data) {
       throw new NotFoundError(
@@ -342,6 +351,7 @@ export class CredentialsService {
       tenantPartner.partyId!,
       tenantPartner.partnerProfileOCPI!,
       version.url,
+      overrideToken,
     );
     if (!versionDetails?.data) {
       throw new NotFoundError('Matching version details not found');
