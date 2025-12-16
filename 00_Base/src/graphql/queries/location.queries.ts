@@ -85,6 +85,9 @@ export const GET_LOCATIONS_QUERY = gql`
             vendorErrorCode
             createdAt
             updatedAt
+            tariffs: Tariffs {
+              id
+            }
           }
         }
       }
@@ -164,6 +167,9 @@ export const GET_LOCATION_BY_ID_QUERY = gql`
             vendorErrorCode
             createdAt
             updatedAt
+            Tariffs {
+              id
+            }
           }
         }
       }
