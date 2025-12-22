@@ -15,6 +15,8 @@ import { routingControllersToSpec } from '../openapi-spec-helper';
 import { getAllSchemas } from '../openapi-spec-helper/schemas';
 import { koaSwagger } from 'koa2-swagger-ui';
 import { Server } from 'http';
+import { buildOcpiErrorResponse } from '../model/OcpiErrorResponse';
+import { OcpiResponseStatusCode } from '../model/OcpiResponse';
 
 export class KoaServer {
   koa!: Koa;
@@ -47,6 +49,24 @@ export class KoaServer {
 
   protected initApp(options: RoutingControllersOptions = {}) {
     this.app = useKoaServer(this.koa, options);
+    // Global per-request error handler: log and respond with OCPI error
+    this.app.use(async (ctx, next) => {
+      try {
+        await next();
+      } catch (err: any) {
+        // Log the error but do not crash the process
+        console.error('Koa request error:', err);
+        ctx.status = 500;
+        ctx.body = buildOcpiErrorResponse(
+          OcpiResponseStatusCode.ServerGenericError,
+          typeof err?.message === 'string'
+            ? err.message
+            : 'Internal server error',
+        );
+        // Emit Koa error event for any listeners
+        ctx.app.emit('error', err, ctx);
+      }
+    });
     this.initLogger();
   }
 

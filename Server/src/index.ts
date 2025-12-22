@@ -73,6 +73,31 @@ export class CitrineOSServer {
     // init cache
     this.initCache();
 
+    // Global exception handlers
+    process.on('uncaughtException', (err: any) => {
+      try {
+        this._logger?.fatal('Uncaught exception', {
+          message: err?.message,
+          name: err?.name,
+          stack: err?.stack,
+        });
+      } catch (_e) {
+        void 0; // noop
+      }
+      // Do not exit: keep process alive, let app recover
+    });
+
+    process.on('unhandledRejection', (reason: any) => {
+      try {
+        this._logger?.error('Unhandled promise rejection', {
+          reason,
+        });
+      } catch (_e) {
+        void 0; // noop
+      }
+      // Do not exit: keep process alive, let app recover
+    });
+
     // Set up shutdown handlers
     for (const event of ['SIGINT', 'SIGTERM', 'SIGQUIT']) {
       process.on(event, async () => {
@@ -107,13 +132,9 @@ export class CitrineOSServer {
   }
 
   async run(): Promise<void> {
-    try {
-      await this.initConfig();
-      await this.initialize();
-      await this.startOcpiServer();
-    } catch (error) {
-      await Promise.reject(error);
-    }
+    await this.initConfig();
+    await this.initialize();
+    await this.startOcpiServer();
   }
 
   protected getOcpiModuleConfig(): Constructable<OcpiModule | IDtoModule>[] {
