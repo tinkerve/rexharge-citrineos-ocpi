@@ -134,7 +134,7 @@ export class CommandsModuleApi
   }
 
   @Post('/callback/:tenantPartnerId/:ocppVersion/:command/:commandId')
-  @AsAdminEndpoint()
+  // @AsAdminEndpoint()
   async postAsynchronousResponse(
     @Param('tenantPartnerId') tenantPartnerId: number,
     @Param('ocppVersion') ocppVersion: OCPPVersion,

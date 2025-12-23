@@ -166,23 +166,31 @@ export class CommandsService {
         'Charging station is offline',
       );
     }
-    if (
-      startSession.connector_id &&
-      !Array.from(chargingStation.connectors || []).some(
+    const connectors = Array.from(chargingStation.connectors || []);
+    if (startSession.connector_id) {
+      const matchingConnector = connectors.find(
         (value) => value.id?.toString() === startSession.connector_id,
-      )
-    ) {
-      this.logger.error('Connector not found for StartSession command', {
-        stationId: chargingStation.id,
-        connectorId: startSession.connector_id,
-      });
-      return ResponseGenerator.buildInvalidOrMissingParametersResponse(
-        {
-          result: CommandResponseType.REJECTED,
-          timeout: this.config.commands.timeout,
-        },
-        'Unknown connector',
       );
+      if (!matchingConnector) {
+        this.logger.error('Connector not found for StartSession command', {
+          stationId: chargingStation.id,
+          connectorId: startSession.connector_id,
+        });
+        return ResponseGenerator.buildInvalidOrMissingParametersResponse(
+          {
+            result: CommandResponseType.REJECTED,
+            timeout: this.config.commands.timeout,
+          },
+          'Unknown connector',
+        );
+      }
+      // Ensure connector_id matches the external connector identifier expected downstream
+      if (
+        matchingConnector.connectorId &&
+        matchingConnector.id?.toString() === startSession.connector_id
+      ) {
+        startSession.connector_id = matchingConnector.connectorId.toString();
+      }
     }
     this.commandExecutor.executeStartSession(
       startSession,
@@ -310,23 +318,31 @@ export class CommandsService {
         'Charging station is offline',
       );
     }
-    if (
-      unlockConnector.connector_id &&
-      !Array.from(chargingStation.connectors || []).some(
+    const connectors = Array.from(chargingStation.connectors || []);
+    if (unlockConnector.connector_id) {
+      const matchingConnector = connectors.find(
         (value) => value.id?.toString() === unlockConnector.connector_id,
-      )
-    ) {
-      this.logger.error('Connector not found for UnlockConnector command', {
-        stationId: chargingStation.id,
-        connectorId: unlockConnector.connector_id,
-      });
-      return ResponseGenerator.buildInvalidOrMissingParametersResponse(
-        {
-          result: CommandResponseType.REJECTED,
-          timeout: this.config.commands.timeout,
-        },
-        'Unknown connector',
       );
+      if (!matchingConnector) {
+        this.logger.error('Connector not found for UnlockConnector command', {
+          stationId: chargingStation.id,
+          connectorId: unlockConnector.connector_id,
+        });
+        return ResponseGenerator.buildInvalidOrMissingParametersResponse(
+          {
+            result: CommandResponseType.REJECTED,
+            timeout: this.config.commands.timeout,
+          },
+          'Unknown connector',
+        );
+      }
+      // Align connector_id to external connector identifier expected downstream
+      if (
+        matchingConnector.connectorId &&
+        matchingConnector.id?.toString() === unlockConnector.connector_id
+      ) {
+        unlockConnector.connector_id = matchingConnector.connectorId.toString();
+      }
     }
     this.commandExecutor.executeUnlockConnector(
       unlockConnector,
