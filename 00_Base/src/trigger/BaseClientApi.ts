@@ -376,6 +376,7 @@ export abstract class BaseClientApi {
         }
       }
 
+      this.logger.debug('Response received:', result);
       // Parse and validate using Zod
       return schema.parse(result);
     } else {
