@@ -66,6 +66,17 @@ export interface BroadcastParams<T extends ZodTypeAny> {
   path?: string;
 }
 
+export interface BroadcastResponse<T> {
+  successes: Array<{
+    partner: ITenantPartnerDto;
+    response: T;
+  }>;
+  failures: Array<{
+    partner: ITenantPartnerDto;
+    error: Error;
+  }>;
+}
+
 export interface TriggerRequestOptions extends IRequestOptions {
   version?: VersionNumber;
   path?: string;
@@ -261,7 +272,7 @@ export abstract class BaseClientApi {
 
   public async broadcastToClients<T extends ZodTypeAny>(
     params: BroadcastParams<T>,
-  ): Promise<T[]> {
+  ): Promise<BroadcastResponse<T>> {
     const {
       cpoCountryCode,
       cpoPartyId,
@@ -283,7 +294,8 @@ export abstract class BaseClientApi {
       `Requesting partners for ${cpoCountryCode}_${cpoPartyId}`,
     );
     this.logger.debug(`Using URL: ${url} with path ${path}`);
-    const responses: T[] = [];
+    const successes: Array<{ partner: ITenantPartnerDto; response: T }> = [];
+    const failures: Array<{ partner: ITenantPartnerDto; error: Error }> = [];
     const response = await this.ocpiGraphqlClient.request<
       TenantPartnersListQueryResult,
       TenantPartnersListQueryVariables
@@ -297,24 +309,35 @@ export abstract class BaseClientApi {
       this.logger.debug(
         `Requesting partner ${partner.countryCode}_${partner.partyId}`,
       );
-      const response = await this.request(
-        cpoCountryCode,
-        cpoPartyId,
-        partner.countryCode!,
-        partner.partyId!,
-        httpMethod,
-        schema,
-        partner.partnerProfileOCPI!,
-        routingHeaders,
-        url,
-        body,
-        paginatedParams,
-        otherParams,
-        path,
-      );
-      responses.push(response);
+      try {
+        const partnerResponse = await this.request(
+          cpoCountryCode,
+          cpoPartyId,
+          partner.countryCode!,
+          partner.partyId!,
+          httpMethod,
+          schema,
+          partner.partnerProfileOCPI!,
+          routingHeaders,
+          url,
+          body,
+          paginatedParams,
+          otherParams,
+          path,
+        );
+        successes.push({ partner, response: partnerResponse });
+        this.logger.debug(
+          `Successfully requested partner ${partner.countryCode}_${partner.partyId}`,
+        );
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        failures.push({ partner, error: err });
+        this.logger.error(
+          `Failed to request partner ${partner.countryCode}_${partner.partyId}: ${err.message}`,
+        );
+      }
     }
-    return responses;
+    return { successes, failures };
   }
 
   protected handleResponse<T extends ZodTypeAny>(
