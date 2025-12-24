@@ -192,11 +192,11 @@ export class CommandsService {
         startSession.connector_id = matchingConnector.connectorId.toString();
       }
     }
-    this.commandExecutor.executeStartSession(
-      startSession,
-      tenantPartner,
-      chargingStation,
-    );
+    this.commandExecutor
+      .executeStartSession(startSession, tenantPartner, chargingStation)
+      .catch((error) => {
+        this.logger.error('Failed to execute StartSession command', error);
+      });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
       timeout: this.config.commands.timeout,
@@ -267,11 +267,11 @@ export class CommandsService {
         'Charging station is offline',
       );
     }
-    this.commandExecutor.executeStopSession(
-      stopSession,
-      tenantPartner,
-      chargingStation,
-    );
+    this.commandExecutor
+      .executeStopSession(stopSession, tenantPartner, chargingStation)
+      .catch((error) => {
+        this.logger.error('Failed to execute StopSession command', error);
+      });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
       timeout: this.config.commands.timeout,
@@ -344,11 +344,11 @@ export class CommandsService {
         unlockConnector.connector_id = matchingConnector.connectorId.toString();
       }
     }
-    this.commandExecutor.executeUnlockConnector(
-      unlockConnector,
-      tenantPartner,
-      chargingStation,
-    );
+    this.commandExecutor
+      .executeUnlockConnector(unlockConnector, tenantPartner, chargingStation)
+      .catch((error) => {
+        this.logger.error('Failed to execute UnlockConnector command', error);
+      });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
       timeout: this.config.commands.timeout,
