@@ -201,17 +201,17 @@ export abstract class BaseClientApi {
           this.handleResponse(schema, response),
         );
       case HttpMethod.Post:
-        this.logger.debug(`Sending POST request to ${url}`);
+        this.logger.debug(`Sending POST request to ${url}`, body);
         return this.createRaw<T>(url, body, options).then((response) =>
           this.handleResponse(schema, response),
         );
       case HttpMethod.Put:
-        this.logger.debug(`Sending PUT request to ${url}`);
+        this.logger.debug(`Sending PUT request to ${url}`, body);
         return this.replaceRaw<T>(url, body, options).then((response) =>
           this.handleResponse(schema, response),
         );
       case HttpMethod.Patch:
-        this.logger.debug(`Sending PATCH request to ${url}`);
+        this.logger.debug(`Sending PATCH request to ${url}`, body);
         return this.updateRaw<T>(url, body, options).then((response) =>
           this.handleResponse(schema, response),
         );
@@ -291,7 +291,7 @@ export abstract class BaseClientApi {
       `Broadcasting to clients for ${moduleId}_${interfaceRole}`,
     );
     this.logger.debug(
-      `Requesting partners for ${cpoCountryCode}_${cpoPartyId}`,
+      `Broadcasting partners for ${cpoCountryCode}_${cpoPartyId}`,
     );
     this.logger.debug(`Using URL: ${url} with path ${path}`);
     const successes: Array<{ partner: ITenantPartnerDto; response: T }> = [];
@@ -307,7 +307,7 @@ export abstract class BaseClientApi {
     const partners = response.TenantPartners as ITenantPartnerDto[];
     for (const partner of partners) {
       this.logger.debug(
-        `Requesting partner ${partner.countryCode}_${partner.partyId}`,
+        `Broadcasting partner ${partner.countryCode}_${partner.partyId}`,
       );
       try {
         const partnerResponse = await this.request(
@@ -327,13 +327,13 @@ export abstract class BaseClientApi {
         );
         successes.push({ partner, response: partnerResponse });
         this.logger.debug(
-          `Successfully requested partner ${partner.countryCode}_${partner.partyId}`,
+          `Successfully Broadcasted partner ${partner.countryCode}_${partner.partyId}`,
         );
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         failures.push({ partner, error: err });
         this.logger.error(
-          `Failed to request partner ${partner.countryCode}_${partner.partyId}: ${err.message}`,
+          `Failed to broadcast to partner ${partner.countryCode}_${partner.partyId}: ${err.message}`,
         );
       }
     }
