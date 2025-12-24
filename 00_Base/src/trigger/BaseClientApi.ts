@@ -376,13 +376,8 @@ export abstract class BaseClientApi {
         }
       }
 
-      try {
-        return schema.parse(result);
-      } catch (e) {
-        this.logger.error('Error during response handling:', result);
-        throw e;
-      }
       // Parse and validate using Zod
+      return schema.parse(result);
     } else {
       throw new UnsuccessfulRequestException(
         'Request did not return a successful status code',
