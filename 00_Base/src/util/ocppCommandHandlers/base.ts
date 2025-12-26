@@ -108,6 +108,12 @@ export abstract class OCPPCommandHandler {
         payload,
         options,
       );
+
+      this.logger.debug('Successful OCPP request response', {
+        url,
+        statusCode: response?.statusCode,
+        response: response?.result,
+      });
     } catch (error: any) {
       response = error;
     }
