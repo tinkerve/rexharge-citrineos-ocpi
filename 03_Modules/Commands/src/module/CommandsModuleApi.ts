@@ -142,6 +142,13 @@ export class CommandsModuleApi
     @Param('commandId') commandId: string,
     @Body() response: any,
   ): Promise<void> {
+    this.logger.debug('postAsynchronousResponse', {
+      tenantPartnerId,
+      ocppVersion,
+      command,
+      commandId,
+      response,
+    });
     await this.commandsExecutor.handleAsyncCommandResponse(
       tenantPartnerId,
       ocppVersion,
