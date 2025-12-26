@@ -42,6 +42,18 @@ export class CommandsService {
 
   @Inject(OcpiConfigToken) readonly config!: OcpiConfig;
 
+  /**
+   * Safely handles and logs command execution errors
+   * Ensures the error is properly formatted as an Error object for tslog
+   */
+  private handleCommandExecutionError(message: string, error: unknown): void {
+    const formattedError =
+      error instanceof Error
+        ? error
+        : new Error(typeof error === 'string' ? error : JSON.stringify(error));
+    this.logger.error(message, formattedError);
+  }
+
   public async postCommand(
     commandType: CommandType,
     payload:
@@ -193,7 +205,10 @@ export class CommandsService {
     this.commandExecutor
       .executeStartSession(startSession, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error('Failed to execute StartSession command', error);
+        this.handleCommandExecutionError(
+          'Failed to execute StartSession command',
+          error,
+        );
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
@@ -268,7 +283,10 @@ export class CommandsService {
     this.commandExecutor
       .executeStopSession(stopSession, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error('Failed to execute StopSession command', error);
+        this.handleCommandExecutionError(
+          'Failed to execute StopSession command',
+          error,
+        );
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
@@ -345,7 +363,10 @@ export class CommandsService {
     this.commandExecutor
       .executeUnlockConnector(unlockConnector, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error('Failed to execute UnlockConnector command', error);
+        this.handleCommandExecutionError(
+          'Failed to execute UnlockConnector command',
+          error,
+        );
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
