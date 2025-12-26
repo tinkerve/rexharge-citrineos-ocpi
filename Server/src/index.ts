@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: 2025 Contributors to the CitrineOS Project
 //
 // SPDX-License-Identifier: Apache-2.0
-
+import type { Constructable } from '@citrineos/base';
 import {
-  Constructable,
   EventGroup,
   eventGroupFromString,
   type ICache,
@@ -11,12 +10,11 @@ import {
   type IModuleApi,
 } from '@citrineos/base';
 import { MemoryCache, RedisCache } from '@citrineos/util';
+import type { IDtoModule, OcpiConfig } from '@citrineos/ocpi-base';
 import {
   Container,
   getDtoEventHandlerMetaData,
   getOcpiSystemConfig,
-  IDtoModule,
-  OcpiConfig,
   OcpiModule,
   OcpiServer,
 } from '@citrineos/ocpi-base';
@@ -30,9 +28,10 @@ import { TariffsModule } from '@citrineos/ocpi-tariffs';
 import { CdrsModule } from '@citrineos/ocpi-cdrs';
 import { TokensModule } from '@citrineos/ocpi-tokens';
 import { DtoRouter } from '@citrineos/dto-router';
-import { createLocalOcpiConfig } from './config/envs/local';
-import { createDockerOcpiConfig } from './config/envs/docker';
-import { ILogObj, Logger } from 'tslog';
+import { createLocalOcpiConfig } from './config/envs/local.js';
+import { createDockerOcpiConfig } from './config/envs/docker.js';
+import type { ILogObj } from 'tslog';
+import { Logger } from 'tslog';
 
 export class CitrineOSServer {
   /**
@@ -73,31 +72,6 @@ export class CitrineOSServer {
     // init cache
     this.initCache();
 
-    // Global exception handlers
-    process.on('uncaughtException', (err: any) => {
-      try {
-        this._logger?.fatal('Uncaught exception', {
-          message: err?.message,
-          name: err?.name,
-          stack: err?.stack,
-        });
-      } catch (_e) {
-        void 0; // noop
-      }
-      // Do not exit: keep process alive, let app recover
-    });
-
-    process.on('unhandledRejection', (reason: any) => {
-      try {
-        this._logger?.error('Unhandled promise rejection', {
-          reason,
-        });
-      } catch (_e) {
-        void 0; // noop
-      }
-      // Do not exit: keep process alive, let app recover
-    });
-
     // Set up shutdown handlers
     for (const event of ['SIGINT', 'SIGTERM', 'SIGQUIT']) {
       process.on(event, async () => {
@@ -132,9 +106,13 @@ export class CitrineOSServer {
   }
 
   async run(): Promise<void> {
-    await this.initConfig();
-    await this.initialize();
-    await this.startOcpiServer();
+    try {
+      await this.initConfig();
+      await this.initialize();
+      await this.startOcpiServer();
+    } catch (error) {
+      await Promise.reject(error);
+    }
   }
 
   protected getOcpiModuleConfig(): Constructable<OcpiModule | IDtoModule>[] {
