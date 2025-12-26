@@ -103,6 +103,7 @@ export const ocpiConfigInputSchema = z.object({
         .object({
           host: z.string().default('localhost').optional(),
           port: z.number().int().positive().default(6379).optional(),
+          password: z.string().default('').optional(),
         })
         .optional(),
     })
@@ -259,6 +260,7 @@ export const ocpiConfigSchema = z.object({
       .object({
         host: z.string(),
         port: z.number().int().positive(),
+        password: z.string(),
       })
       .optional(),
   }),
