@@ -5,7 +5,7 @@
 import type { IChargingStationDto, ITenantPartnerDto } from '@citrineos/base';
 import { OCPP1_6, OCPPVersion } from '@citrineos/base';
 import type { IRequestOptions } from 'typed-rest-client';
-import { Service } from 'typedi';
+import { Inject, Service } from 'typedi';
 import { OCPP_COMMAND_HANDLER, OCPPCommandHandler } from './base.js';
 import type { StartSession } from '../../model/StartSession.js';
 import type { IRequestQueryParams } from 'typed-rest-client/Interfaces.js';
@@ -13,9 +13,13 @@ import { CommandType } from '../../model/CommandType.js';
 import type { StopSession } from '../../model/StopSession.js';
 import type { UnlockConnector } from '../../index.js';
 import { CommandResultType } from '../../index.js';
+import { ILogObj, Logger } from 'tslog';
 
 @Service({ id: OCPP_COMMAND_HANDLER, multiple: true })
 export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
+  @Inject()
+  protected logger!: Logger<ILogObj>;
+
   public readonly supportedVersion = OCPPVersion.OCPP1_6;
 
   public async sendStartSessionCommand(
@@ -24,6 +28,7 @@ export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
     chargingStation: IChargingStationDto,
     commandId: string,
   ): Promise<void> {
+    this.logger.debug('Sending OCPP 1.6 StartSession command 1');
     const options: IRequestOptions = {
       additionalHeaders: this.config.commands.coreHeaders,
     };
@@ -41,6 +46,8 @@ export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
         connectorId: Number(startSession.connector_id),
         idTag: startSession.token.uid,
       };
+
+    this.logger.debug('Sending OCPP 1.6 StartSession command 2');
     await this.sendOCPPMessage(
       this.config.commands.ocpp1_6.remoteStartTransactionRequestUrl,
       remoteStartTransactionRequest,
