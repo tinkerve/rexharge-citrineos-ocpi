@@ -522,6 +522,10 @@ export class CommandExecutor {
         COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
       )
       .then((value) => {
+        this.logger.debug('Command cache onChange triggered', {
+          commandId,
+          value,
+        });
         if (value !== COMMAND_RESPONSE_URL_CACHE_RESOLVED) {
           this.logger.warn('Command timed out', {
             commandId,
