@@ -4,23 +4,19 @@
 
 import { Inject, Service } from 'typedi';
 import { CancelReservation } from '../model/CancelReservation';
-import { ReserveNow } from '../model/ReserveNow';
-import { StartSession } from '../model/StartSession';
-import { StopSession } from '../model/StopSession';
-import { UnlockConnector } from '../model/UnlockConnector';
-import { CommandType } from '../model/CommandType';
 import {
   CommandResponseType,
   OcpiCommandResponse,
 } from '../model/CommandResponse';
+import { CommandType } from '../model/CommandType';
+import { ReserveNow } from '../model/ReserveNow';
+import { StartSession } from '../model/StartSession';
+import { StopSession } from '../model/StopSession';
+import { UnlockConnector } from '../model/UnlockConnector';
 // import { CommandExecutor } from '../util/CommandExecutor';
-import { BadRequestError, NotFoundError } from 'routing-controllers';
-import { ResponseGenerator } from '../util/response.generator';
-import { CommandExecutor } from '../util/CommandExecutor';
-import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
-import { ILogObj, Logger } from 'tslog';
-import { OcpiConfig, OcpiConfigToken } from '../config/ocpi.types';
 import { IChargingStationDto, ITenantPartnerDto } from '@citrineos/base';
+import { OcpiConfig, OcpiConfigToken } from '../config/ocpi.types';
+import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import {
   GetChargingStationByIdQueryResult,
   GetChargingStationByIdQueryVariables,
@@ -28,13 +24,15 @@ import {
   GetTransactionByTransactionIdQueryVariables,
 } from '../graphql/operations';
 import { GET_CHARGING_STATION_BY_ID_QUERY } from '../graphql/queries/chargingStation.queries';
-import { EXTRACT_STATION_ID } from '../model/DTO/EvseDTO';
 import { GET_TRANSACTION_BY_TRANSACTION_ID_QUERY } from '../graphql/queries/transaction.queries';
+import { EXTRACT_STATION_ID } from '../model/DTO/EvseDTO';
+import { CommandExecutor } from '../util/CommandExecutor';
+import { OcpiLogger } from '../util/OcpiLogger';
+import { ResponseGenerator } from '../util/response.generator';
 
 @Service()
 export class CommandsService {
-  @Inject()
-  protected logger!: Logger<ILogObj>;
+  constructor(private readonly logger: OcpiLogger) {}
 
   @Inject()
   protected ocpiGraphqlClient!: OcpiGraphqlClient;
@@ -195,10 +193,7 @@ export class CommandsService {
     this.commandExecutor
       .executeStartSession(startSession, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error(
-          'Failed to execute StartSession command',
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        this.logger.error('Failed to execute StartSession command', error);
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
@@ -273,10 +268,7 @@ export class CommandsService {
     this.commandExecutor
       .executeStopSession(stopSession, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error(
-          'Failed to execute StopSession command',
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        this.logger.error('Failed to execute StopSession command', error);
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
@@ -353,10 +345,7 @@ export class CommandsService {
     this.commandExecutor
       .executeUnlockConnector(unlockConnector, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error(
-          'Failed to execute UnlockConnector command',
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        this.logger.error('Failed to execute UnlockConnector command', error);
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
