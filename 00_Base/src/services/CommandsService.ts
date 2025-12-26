@@ -195,7 +195,10 @@ export class CommandsService {
     this.commandExecutor
       .executeStartSession(startSession, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error('Failed to execute StartSession command', error);
+        this.logger.error(
+          'Failed to execute StartSession command',
+          error instanceof Error ? error : new Error(String(error)),
+        );
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
@@ -270,7 +273,10 @@ export class CommandsService {
     this.commandExecutor
       .executeStopSession(stopSession, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error('Failed to execute StopSession command', error);
+        this.logger.error(
+          'Failed to execute StopSession command',
+          error instanceof Error ? error : new Error(String(error)),
+        );
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
@@ -347,7 +353,10 @@ export class CommandsService {
     this.commandExecutor
       .executeUnlockConnector(unlockConnector, tenantPartner, chargingStation)
       .catch((error) => {
-        this.logger.error('Failed to execute UnlockConnector command', error);
+        this.logger.error(
+          'Failed to execute UnlockConnector command',
+          error instanceof Error ? error : new Error(String(error)),
+        );
       });
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.ACCEPTED,
