@@ -26,6 +26,7 @@ import {
   LocationMapper,
 } from '../mapper/LocationMapper';
 import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
+import { EvseStatus } from '../model/EvseStatus';
 
 @Service()
 export class LocationsBroadcaster extends BaseBroadcaster {
@@ -89,6 +90,21 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     if (!evse) throw new Error('Failed to map EVSE data');
     const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(evseDto.stationId, evseDto.id!)}`;
     await this.broadcastEvse(tenant, evse, HttpMethod.Put, path);
+  }
+
+  async broadcastPatchEvseStatus(
+    tenant: ITenantDto,
+    evseDto: Partial<IEvseDto>,
+    aggregatedStatus: EvseStatus,
+  ): Promise<void> {
+    const locationId = evseDto.chargingStation?.locationId;
+    if (!locationId) throw new Error('Location ID missing in EVSE data');
+    const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(evseDto.stationId!, evseDto.id!)}`;
+    const evseData: Partial<EvseDTO> = {
+      status: aggregatedStatus,
+      last_updated: evseDto.updatedAt,
+    };
+    await this.broadcastEvse(tenant, evseData, HttpMethod.Patch, path);
   }
 
   async broadcastPatchEvse(

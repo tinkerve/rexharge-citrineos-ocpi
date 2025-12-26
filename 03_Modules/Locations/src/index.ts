@@ -7,6 +7,7 @@ import {
   AsDtoEventHandler,
   DtoEventObjectType,
   DtoEventType,
+  EvseMapper,
   GET_CHARGING_STATION_BY_ID_QUERY,
   GetChargingStationByIdQueryResult,
   GetChargingStationByIdQueryVariables,
@@ -27,6 +28,7 @@ import {
   ILocationDto,
 } from '@citrineos/base';
 import { Inject, Service } from 'typedi';
+import { EvseStatus } from '@citrineos/ocpi-base/src/model/EvseStatus';
 
 export { LocationsModuleApi } from './module/LocationsModuleApi';
 export { ILocationsModuleApi } from './module/ILocationsModuleApi';
@@ -239,11 +241,77 @@ export class LocationsModule extends AbstractDtoModule implements OcpiModule {
     connectorDto.chargingStation = chargingStationResponse
       .ChargingStations[0] as IChargingStationDto;
 
-    // TODO: filter out status updates, since they should only apply at the EVSE level
+    // Check if this is a status update
+    const isStatusUpdate = this.isStatusOnlyUpdate(connectorDto);
 
-    await this.locationsBroadcaster.broadcastPatchConnector(
-      tenant,
-      connectorDto,
+    if (isStatusUpdate) {
+      // Status updates should be broadcasted at EVSE level with aggregated status
+      this._logger.debug(
+        `Broadcasting connector status update at EVSE level for connector ${connectorDto.id}`,
+      );
+
+      const connectorData = connectorDto.chargingStation.connectors?.filter(
+        (connector) =>
+          connector.evseId === connectorDto.evseId &&
+          connector.stationId === connectorDto.stationId,
+      );
+
+      if (!connectorData || connectorData.length === 0) {
+        this._logger.error(
+          `Connector data not found for Connector ID ${connectorDto.id}, cannot aggregate status.`,
+        );
+        return;
+      }
+
+      // Aggregate the status from all connectors
+      const aggregatedStatus =
+        EvseMapper.mapEvseStatusFromConnectors(connectorData);
+
+      // Broadcast EVSE patch with aggregated status
+      const evseDto: Partial<IEvseDto> = {
+        id: connectorDto.evseId,
+        stationId: connectorDto.stationId,
+        chargingStation: connectorDto.chargingStation,
+        tenant: tenant,
+        updatedAt: connectorDto.updatedAt,
+      };
+
+      this._logger.debug(
+        `Aggregated EVSE status: ${aggregatedStatus} for EVSE ${connectorDto.evseId}`,
+      );
+
+      await this.locationsBroadcaster.broadcastPatchEvseStatus(
+        tenant,
+        evseDto,
+        aggregatedStatus,
+      );
+    } else {
+      // Non-status updates should be broadcasted at connector level
+      await this.locationsBroadcaster.broadcastPatchConnector(
+        tenant,
+        connectorDto,
+      );
+    }
+  }
+
+  private isStatusOnlyUpdate(connectorDto: Partial<IConnectorDto>): boolean {
+    // Get all keys except metadata fields
+    const updateKeys = Object.keys(connectorDto).filter(
+      (key) =>
+        ![
+          'id',
+          'evseId',
+          'stationId',
+          'tenant',
+          'tenantId',
+          'chargingStation',
+          'updatedAt',
+          'createdAt',
+          'timestamp',
+        ].includes(key),
     );
+
+    // If only status field is being updated
+    return updateKeys.length === 1 && updateKeys.includes('status');
   }
 }
