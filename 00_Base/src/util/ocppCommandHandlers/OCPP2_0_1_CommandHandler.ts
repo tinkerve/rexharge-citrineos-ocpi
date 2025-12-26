@@ -210,6 +210,11 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
     response: any,
     commandId: string,
   ): Promise<void> {
+    this.logger.debug('Handling async command response', {
+      command,
+      responseUrl,
+      commandId,
+    });
     switch (command) {
       case CommandType.START_SESSION:
         return this.handleRequestStartTransactionResponse(

@@ -159,6 +159,11 @@ export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
     response: any,
     commandId: string,
   ): Promise<void> {
+    this.logger.debug('Handling async command response', {
+      command,
+      responseUrl,
+      commandId,
+    });
     switch (command) {
       case CommandType.START_SESSION:
         return this.handleRemoteStartTransactionResponse(
