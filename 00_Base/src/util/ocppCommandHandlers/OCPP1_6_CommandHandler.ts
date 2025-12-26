@@ -28,7 +28,6 @@ export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
     chargingStation: IChargingStationDto,
     commandId: string,
   ): Promise<void> {
-    this.logger.debug('Sending OCPP 1.6 StartSession command 1');
     const options: IRequestOptions = {
       additionalHeaders: this.config.commands.coreHeaders,
     };
@@ -47,7 +46,6 @@ export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
         idTag: startSession.token.uid,
       };
 
-    this.logger.debug('Sending OCPP 1.6 StartSession command 2');
     await this.sendOCPPMessage(
       this.config.commands.ocpp1_6.remoteStartTransactionRequestUrl,
       remoteStartTransactionRequest,

@@ -205,6 +205,7 @@ export class CommandsService {
     this.commandExecutor
       .executeStartSession(startSession, tenantPartner, chargingStation)
       .catch((error) => {
+        console.log('error', error);
         this.handleCommandExecutionError(
           'Failed to execute StartSession command',
           error,
