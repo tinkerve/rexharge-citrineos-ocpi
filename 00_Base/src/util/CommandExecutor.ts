@@ -526,6 +526,7 @@ export class CommandExecutor {
           commandId,
           value,
         });
+        // Check if command completed successfully or timed out
         if (value !== COMMAND_RESPONSE_URL_CACHE_RESOLVED) {
           this.logger.warn('Command timed out', {
             commandId,
@@ -556,6 +557,10 @@ export class CommandExecutor {
                 },
               );
             });
+        } else {
+          this.logger.debug('Command completed successfully', {
+            commandId,
+          });
         }
       })
       .catch((error: any) => {

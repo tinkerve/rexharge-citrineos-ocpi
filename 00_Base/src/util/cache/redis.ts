@@ -18,6 +18,12 @@ import {
  */
 export class RedisCache implements ICache {
   private _client: RedisClientType<RedisModules, RedisFunctions, RedisScripts>;
+  private _subscriber: RedisClientType<
+    RedisModules,
+    RedisFunctions,
+    RedisScripts
+  > | null = null;
+  private _subscriberInitPromise: Promise<void> | null = null;
 
   constructor(clientOptions?: RedisClientOptions) {
     this._client = clientOptions ? createClient(clientOptions) : createClient();
@@ -31,6 +37,44 @@ export class RedisCache implements ICache {
       .catch((error) => {
         console.log('Error connecting to Redis', error);
       });
+  }
+
+  /**
+   * Lazy initialization of subscriber client
+   */
+  private async getSubscriber(): Promise<
+    RedisClientType<RedisModules, RedisFunctions, RedisScripts>
+  > {
+    if (this._subscriber && this._subscriber.isOpen) {
+      return this._subscriber;
+    }
+
+    // If already initializing, wait for that to complete
+    if (this._subscriberInitPromise) {
+      await this._subscriberInitPromise;
+      return this._subscriber!;
+    }
+
+    // Initialize subscriber
+    this._subscriberInitPromise = (async () => {
+      try {
+        this._subscriber = this._client.duplicate();
+        this._subscriber.on('error', (err) =>
+          console.error('Redis subscriber error', err),
+        );
+        await this._subscriber.connect();
+        console.log('Redis subscriber connected');
+      } catch (error) {
+        console.error('Error initializing Redis subscriber', error);
+        this._subscriber = null;
+        throw error;
+      } finally {
+        this._subscriberInitPromise = null;
+      }
+    })();
+
+    await this._subscriberInitPromise;
+    return this._subscriber!;
   }
 
   exists(key: string, namespace?: string): Promise<boolean> {
@@ -55,82 +99,80 @@ export class RedisCache implements ICache {
     key = `${namespace}:${key}`;
 
     return new Promise((resolve) => {
-      let isResolved = false; // Flag to prevent multiple resolutions
-      const subscriber = createClient();
+      let isResolved = false;
+      let timeoutId: NodeJS.Timeout;
+      const channel = `__keyspace@0__:${key}`;
 
-      // Cleanup function to safely quit subscriber
-      const cleanup = async () => {
+      const cleanup = () => {
         if (isResolved) return;
         isResolved = true;
-        try {
-          await subscriber.quit();
-        } catch (error) {
-          console.log('Error quitting subscriber', error);
+
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+
+        // Unsubscribe from this specific channel
+        this.getSubscriber()
+          .then((subscriber) => subscriber.unsubscribe(channel))
+          .catch((error) => {
+            console.log('Error unsubscribing from channel', error);
+          });
+      };
+
+      const messageHandler = async (message: string) => {
+        if (isResolved) return;
+
+        switch (message) {
+          case 'set':
+            try {
+              const value = await this.get(key, namespace, classConstructor);
+              resolve(value);
+              cleanup();
+            } catch (error) {
+              console.log('Error getting value on set event', error);
+            }
+            break;
+
+          case 'del':
+          case 'expire':
+            resolve(null);
+            cleanup();
+            break;
+
+          default:
+            // Do nothing for other events
+            break;
         }
       };
 
-      // Async initialization function
       const initialize = async () => {
         try {
-          // CRITICAL: Wait for subscriber to be fully connected
-          await subscriber.connect();
+          const subscriber = await this.getSubscriber();
 
           // Subscribe to keyspace notifications
-          await subscriber.subscribe(
-            `__keyspace@0__:${key}`,
-            async (channel, message) => {
-              if (isResolved) return; // Already resolved, ignore
-
-              switch (message) {
-                case 'set':
-                  try {
-                    const value = await this.get(
-                      key,
-                      namespace,
-                      classConstructor,
-                    );
-                    resolve(value);
-                    await cleanup();
-                  } catch (error) {
-                    console.log('Error getting value on set event', error);
-                  }
-                  break;
-
-                case 'del':
-                case 'expire':
-                  resolve(null);
-                  await cleanup();
-                  break;
-
-                default:
-                  // Do nothing for other events
-                  break;
-              }
-            },
-          );
+          await subscriber.subscribe(channel, messageHandler);
 
           // Set timeout as fallback
-          setTimeout(async () => {
-            if (isResolved) return; // Already resolved by subscription
+          timeoutId = setTimeout(async () => {
+            if (isResolved) return;
 
             try {
               const value = await this.get(key, namespace, classConstructor);
               resolve(value);
-              await cleanup();
+              cleanup();
             } catch (error) {
               console.log('Error getting value on timeout', error);
               resolve(null);
-              await cleanup();
+              cleanup();
             }
           }, waitSeconds * 1000);
         } catch (error) {
-          console.log('Error creating Redis subscriber', error);
+          console.log('Error setting up Redis subscription', error);
           resolve(null);
-          await cleanup();
+          cleanup();
         }
       };
 
-      // Start initialization
       initialize();
     });
   }
@@ -190,5 +232,21 @@ export class RedisCache implements ICache {
         }
         return false;
       });
+  }
+
+  /**
+   * Cleanup method to close connections gracefully
+   */
+  async close(): Promise<void> {
+    try {
+      if (this._subscriber && this._subscriber.isOpen) {
+        await this._subscriber.quit();
+        console.log('Redis subscriber disconnected');
+      }
+      await this._client.quit();
+      console.log('Redis client disconnected');
+    } catch (error) {
+      console.error('Error closing Redis connections', error);
+    }
   }
 }

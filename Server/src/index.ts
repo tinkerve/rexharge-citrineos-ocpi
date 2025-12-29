@@ -148,6 +148,7 @@ export class CitrineOSServer {
             port: this.ocpiConfig!.cache.redis.port,
           },
           password: this.ocpiConfig!.cache.redis.password,
+          database: 2,
         })
       : new MemoryCache();
   }
