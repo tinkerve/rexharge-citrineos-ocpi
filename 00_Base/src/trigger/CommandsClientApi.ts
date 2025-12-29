@@ -46,7 +46,7 @@ export class CommandsClientApi extends BaseClientApi {
       commandId,
       COMMAND_RESPONSE_URL_CACHE_RESOLVED,
       COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
-      300, // Must be longer than command timeout to prevent false timeout triggers
+      5, // Flush the resolution after a few seconds so that it doesn't stay in cache indefinitely
     );
 
     return this.request(
