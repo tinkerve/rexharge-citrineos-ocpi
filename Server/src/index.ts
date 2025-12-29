@@ -9,7 +9,7 @@ import {
   type IModule,
   type IModuleApi,
 } from '@citrineos/base';
-import { MemoryCache, RedisCache } from '@citrineos/util';
+import { MemoryCache } from '@citrineos/util';
 import type { IDtoModule, OcpiConfig } from '@citrineos/ocpi-base';
 import {
   Container,
@@ -17,6 +17,7 @@ import {
   getOcpiSystemConfig,
   OcpiModule,
   OcpiServer,
+  RedisCache,
 } from '@citrineos/ocpi-base';
 import { CommandsModule } from '@citrineos/ocpi-commands';
 import { VersionsModule } from '@citrineos/ocpi-versions';

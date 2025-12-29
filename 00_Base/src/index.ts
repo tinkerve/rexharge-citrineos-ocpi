@@ -234,6 +234,7 @@ export { AsAdminEndpoint } from './util/decorators/AsAdminEndpoint';
 
 export { MessageSenderWrapper } from './util/MessageSenderWrapper';
 export { MessageHandlerWrapper } from './util/MessageHandlerWrapper';
+export { RedisCache } from './util/cache/redis';
 export { CacheWrapper } from './util/CacheWrapper';
 export { ResponseGenerator } from './util/response.generator';
 export { versionIdParam } from './util/decorators/VersionNumberParam';
