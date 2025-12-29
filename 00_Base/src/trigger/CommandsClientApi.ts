@@ -16,9 +16,13 @@ import {
   COMMAND_RESPONSE_URL_CACHE_RESOLVED,
 } from '../util/Consts';
 import { CacheWrapper } from '../util/CacheWrapper';
+import { ILogObj, Logger } from 'tslog';
 
 @Service()
 export class CommandsClientApi extends BaseClientApi {
+  @Inject()
+  protected logger!: Logger<ILogObj>;
+
   protected cache!: ICache;
 
   constructor(@Inject() cacheWrapper: CacheWrapper) {
@@ -47,6 +51,15 @@ export class CommandsClientApi extends BaseClientApi {
       COMMAND_RESPONSE_URL_CACHE_RESOLVED,
       COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
       5, // Flush the resolution after a few seconds so that it doesn't stay in cache indefinitely
+    );
+
+    // Debug: Verify cache value was set correctly
+    const cachedValue = await this.cache.get(
+      commandId,
+      COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
+    );
+    this.logger.debug(
+      `Cache retrieval after set - commandId: ${commandId}, cachedValue: ${JSON.stringify(cachedValue)}`,
     );
 
     return this.request(
