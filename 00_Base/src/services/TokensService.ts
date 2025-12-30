@@ -128,7 +128,7 @@ export class TokensService {
           status: authorization.status!,
           language1: authorization.language1,
           groupAuthorizationId,
-          realTimeAuth: authorization.realTimeAuth,
+          realTimeAuth: authorization.realTimeAuth || 'Always',
           updatedAt: token.last_updated,
         },
       });
@@ -150,7 +150,7 @@ export class TokensService {
         status: authorization.status!,
         language1: authorization.language1,
         groupAuthorizationId,
-        realTimeAuth: authorization.realTimeAuth,
+        realTimeAuth: authorization.realTimeAuth || 'Always',
         createdAt: timestamp,
         updatedAt: timestamp,
       });

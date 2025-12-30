@@ -26,6 +26,8 @@ import {
 import { GET_CHARGING_STATION_BY_ID_QUERY } from '../graphql/queries/chargingStation.queries';
 import { GET_TRANSACTION_BY_TRANSACTION_ID_QUERY } from '../graphql/queries/transaction.queries';
 import { EXTRACT_STATION_ID } from '../model/DTO/EvseDTO';
+import { TokenDTO } from '../model/DTO/TokenDTO';
+import { TokensService } from './TokensService';
 import { CommandExecutor } from '../util/CommandExecutor';
 import { OcpiLogger } from '../util/OcpiLogger';
 import { ResponseGenerator } from '../util/response.generator';
@@ -36,6 +38,9 @@ export class CommandsService {
 
   @Inject()
   protected ocpiGraphqlClient!: OcpiGraphqlClient;
+
+  @Inject()
+  protected tokensService!: TokensService;
 
   @Inject()
   protected commandExecutor!: CommandExecutor;
@@ -52,6 +57,30 @@ export class CommandsService {
         ? error
         : new Error(typeof error === 'string' ? error : JSON.stringify(error));
     this.logger.error(message, formattedError);
+  }
+
+  private async validateToken(
+    token: TokenDTO,
+    tenantPartner: ITenantPartnerDto,
+  ): Promise<void> {
+    if (!tenantPartner.tenant?.id || !tenantPartner.id) {
+      throw new Error('Missing tenant identifiers to whitelist token');
+    }
+
+    const existingToken = await this.tokensService.getToken({
+      uid: token.uid,
+      type: token.type,
+      country_code: token.country_code,
+      party_id: token.party_id,
+    });
+
+    if (existingToken) return;
+
+    await this.tokensService.upsertToken(
+      token,
+      tenantPartner.tenant.id,
+      tenantPartner.id,
+    );
   }
 
   public async postCommand(
@@ -104,9 +133,39 @@ export class CommandsService {
   }
 
   private async handleReserveNow(
-    _reserveNow: ReserveNow,
-    _tenantPartner: ITenantPartnerDto,
+    reserveNow: ReserveNow,
+    tenantPartner: ITenantPartnerDto,
   ): Promise<OcpiCommandResponse> {
+    if (
+      tenantPartner.countryCode !== reserveNow.token.country_code ||
+      tenantPartner.partyId !== reserveNow.token.party_id
+    ) {
+      this.logger.error('Token information does not match credentials');
+      return ResponseGenerator.buildInvalidOrMissingParametersResponse(
+        {
+          result: CommandResponseType.REJECTED,
+          timeout: this.config.commands.timeout,
+        },
+        'Token information does not match credentials',
+      );
+    }
+
+    try {
+      await this.validateToken(reserveNow.token, tenantPartner);
+    } catch (error) {
+      this.handleCommandExecutionError(
+        'Failed to save token before ReserveNow',
+        error,
+      );
+      return ResponseGenerator.buildGenericClientErrorResponse(
+        {
+          result: CommandResponseType.REJECTED,
+          timeout: this.config.commands.timeout,
+        },
+        'Unable to save token',
+      );
+    }
+
     return ResponseGenerator.buildGenericSuccessResponse({
       result: CommandResponseType.NOT_SUPPORTED,
       timeout: this.config.commands.timeout,
@@ -140,6 +199,23 @@ export class CommandsService {
         'Token information does not match credentials',
       );
     }
+
+    try {
+      await this.validateToken(startSession.token, tenantPartner);
+    } catch (error) {
+      this.handleCommandExecutionError(
+        'Failed to save token before StartSession',
+        error,
+      );
+      return ResponseGenerator.buildGenericClientErrorResponse(
+        {
+          result: CommandResponseType.REJECTED,
+          timeout: this.config.commands.timeout,
+        },
+        'Unable to save token',
+      );
+    }
+
     const chargingStationResponse = await this.ocpiGraphqlClient.request<
       GetChargingStationByIdQueryResult,
       GetChargingStationByIdQueryVariables

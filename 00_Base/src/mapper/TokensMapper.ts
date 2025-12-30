@@ -92,7 +92,7 @@ export class TokensMapper {
   public static mapWhitelistType(
     whitelist: WhitelistType | undefined,
   ): AuthorizationWhitelistType | null | undefined {
-    switch(whitelist) {
+    switch (whitelist) {
       case WhitelistType.ALLOWED:
         return AuthorizationWhitelistType.Allowed;
       case WhitelistType.ALLOWED_OFFLINE:
@@ -127,6 +127,14 @@ export class TokensMapper {
         additionalIdToken: tokenDto.visual_number,
         type: 'visual_number',
       });
+    } else {
+      //use contract_id as visual_number if visual_number is not provided
+      if (tokenDto.contract_id) {
+        partialAdditionalInfo.push({
+          additionalIdToken: tokenDto.contract_id,
+          type: 'visual_number',
+        });
+      }
     }
     if (tokenDto.issuer) {
       partialAdditionalInfo.push({
