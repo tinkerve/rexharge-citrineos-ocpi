@@ -316,6 +316,21 @@ export class CommandsService {
       );
     }
     const transaction = transactionResponse.Transactions[0];
+
+    if (!transaction.transactionId) {
+      this.logger.error('Transaction has no transactionId', {
+        transactionId: transaction.id,
+      });
+      return ResponseGenerator.buildInvalidOrMissingParametersResponse(
+        {
+          result: CommandResponseType.REJECTED,
+          timeout: this.config.commands.timeout,
+        },
+        'Session is invalid',
+      );
+    }
+    // Align stopSession session_id to the actual transactionId
+    stopSession.session_id = transaction.transactionId;
     if (
       tenantPartner.countryCode !==
         transaction.authorization!.tenantPartner!.countryCode! ||

@@ -104,6 +104,7 @@ export const GET_TRANSACTION_BY_TRANSACTION_ID_QUERY = gql`
       chargingStation: ChargingStation {
         id
         isOnline
+        protocol
       }
       transactionEvents: TransactionEvents {
         id
