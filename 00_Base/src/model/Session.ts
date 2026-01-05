@@ -15,6 +15,7 @@ export const SessionSchema = z.object({
   country_code: z.string().min(2).max(2),
   party_id: z.string().max(3),
   id: z.string().max(36),
+  transaction_id: z.string().max(36),
   start_date_time: z.coerce.date(),
   end_date_time: z.coerce.date().nullable().optional(),
   kwh: z.number(),

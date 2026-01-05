@@ -77,13 +77,15 @@ export class CdrMapper extends BaseTransactionMapper {
   ): Promise<Cdr[]> {
     return Promise.all(
       sessions
-        .filter((session) => transactionIdToTariffMap.has(session.id))
+        .filter((session) =>
+          transactionIdToTariffMap.has(session.transaction_id),
+        )
         .map((session) =>
           this.mapSessionToCDR(
             session,
-            transactionIdToLocationMap.get(session.id)!,
-            transactionIdToTariffMap.get(session.id)!,
-            transactionIdToOcpiTariffMap.get(session.id)!,
+            transactionIdToLocationMap.get(session.transaction_id)!,
+            transactionIdToTariffMap.get(session.transaction_id)!,
+            transactionIdToOcpiTariffMap.get(session.transaction_id)!,
           ),
         ),
     );

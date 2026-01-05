@@ -322,6 +322,7 @@ export class SessionMapper extends BaseTransactionMapper {
     return {
       country_code: location.country_code,
       party_id: location.party_id,
+      transaction_id: transaction.transactionId,
       id: transaction.id!.toString(),
       start_date_time: transaction.startTime
         ? new Date(transaction.startTime)
