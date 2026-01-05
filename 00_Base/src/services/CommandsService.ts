@@ -301,7 +301,7 @@ export class CommandsService {
       GetTransactionByTransactionIdQueryVariables
     >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
       // We note assume session id is now the database id
-      transactionId: stopSession.session_id,
+      transactionId: parseInt(stopSession.session_id),
     });
     if (!transactionResponse.Transactions[0]) {
       this.logger.error('Unknown transaction', {

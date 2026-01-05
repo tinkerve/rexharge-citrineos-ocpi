@@ -100,6 +100,7 @@ export const GET_TRANSACTION_BY_TRANSACTION_ID_QUERY = gql`
             partyId
           }
         }
+        additionalInfo
       }
       chargingStation: ChargingStation {
         id

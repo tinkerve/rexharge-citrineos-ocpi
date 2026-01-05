@@ -5,14 +5,16 @@
 import { z } from 'zod';
 import { OcpiResponseStatusCode } from './OcpiResponse';
 
-export const OcpiEmptyResponseSchema = z.object({
-  status_code: z
-    .nativeEnum(OcpiResponseStatusCode)
-    .default(OcpiResponseStatusCode.GenericSuccessCode),
-  status_message: z.string().optional(),
-  timestamp: z.coerce.date(),
-  data: z.union([z.undefined(), z.null(), z.any()]).optional(),
-});
+export const OcpiEmptyResponseSchema = z
+  .object({
+    status_code: z
+      .nativeEnum(OcpiResponseStatusCode)
+      .default(OcpiResponseStatusCode.GenericSuccessCode),
+    status_message: z.string().optional(),
+    timestamp: z.coerce.date(),
+    data: z.union([z.undefined(), z.null(), z.any()]).optional(),
+  })
+  .nullable();
 export const OcpiEmptyResponseSchemaName = 'OcpiEmptyResponse';
 
 export type OcpiEmptyResponse = z.infer<typeof OcpiEmptyResponseSchema>;

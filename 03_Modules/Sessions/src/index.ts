@@ -69,7 +69,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
       >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-        transactionId: meterValueDto.transactionId!,
+        transactionId: meterValueDto.transactionDatabaseId!,
       });
 
       if (!transactionResponse.Transactions[0]) {
@@ -119,7 +119,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       GetTransactionByTransactionIdQueryResult,
       GetTransactionByTransactionIdQueryVariables
     >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-      transactionId: transactionDto.transactionId!,
+      transactionId: transactionDto.id!,
     });
 
     if (fullTransactionResponse.Transactions[0]) {
@@ -160,7 +160,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
       >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-        transactionId: transactionDto.transactionId!,
+        transactionId: transactionDto.id!,
       });
 
       if (!fullTransactionDtoResponse.Transactions[0]) {
@@ -198,7 +198,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         `Meter Value belongs to Transaction: ${meterValueDto.transactionDatabaseId}`,
       );
       if (!meterValueDto.tariffId) {
-        this._logger.error(
+        this._logger.warn(
           `Tariff ID missing in Meter Value notification for Transaction ${meterValueDto.transactionDatabaseId}, cannot broadcast.`,
         );
         return;

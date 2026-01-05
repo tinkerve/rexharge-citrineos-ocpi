@@ -223,7 +223,10 @@ export type GetLocationsQueryResult = {
           vendorId?: string | null,
           vendorErrorCode?: string | null,
           createdAt: any,
-          updatedAt: any
+          updatedAt: any,
+          tariffs: Array<{
+            id: number
+          }>
         }>
       }>
     }>
@@ -305,7 +308,10 @@ export type GetLocationByIdQueryResult = {
           vendorId?: string | null,
           vendorErrorCode?: string | null,
           createdAt: any,
-          updatedAt: any
+          updatedAt: any,
+          Tariffs?: Array<{
+            id: number
+          }>
         }>
       }>
     }>
@@ -820,7 +826,7 @@ export type GetTransactionsQueryResult = {
 };
 
 export type GetTransactionByTransactionIdQueryVariables = Exact<{
-  transactionId: Scalars['String']['input'];
+  transactionId: Scalars['Int']['input'];
 }>;
 
 
@@ -864,7 +870,8 @@ export type GetTransactionByTransactionIdQueryResult = {
     } | null,
     chargingStation?: {
       id: string,
-      isOnline?: boolean | null
+      isOnline?: boolean | null,
+      protocol?: string | null
     } | null,
     transactionEvents: Array<{
       id: number,
