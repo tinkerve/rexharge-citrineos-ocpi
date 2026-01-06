@@ -323,8 +323,7 @@ export class SessionMapper extends BaseTransactionMapper {
     return {
       country_code: location.country_code,
       party_id: location.party_id,
-      transaction_id: transaction.transactionId,
-      id: transaction.id!.toString(),
+      id: transaction.transactionId!,
       start_date_time: transaction.startTime
         ? toISOStringIfNeeded(transaction.startTime, true)
         : (() => {

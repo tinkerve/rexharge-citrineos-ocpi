@@ -69,7 +69,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
       >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-        transactionId: meterValueDto.transactionDatabaseId!,
+        transactionId: meterValueDto.transactionId!,
       });
 
       if (!transactionResponse.Transactions[0]) {
@@ -119,7 +119,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       GetTransactionByTransactionIdQueryResult,
       GetTransactionByTransactionIdQueryVariables
     >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-      transactionId: transactionDto.id!,
+      transactionId: transactionDto.transactionId!,
     });
 
     if (fullTransactionResponse.Transactions[0]) {
@@ -160,7 +160,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
       >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-        transactionId: transactionDto.id!,
+        transactionId: transactionDto.transactionId!,
       });
 
       if (!fullTransactionDtoResponse.Transactions[0]) {
@@ -193,13 +193,13 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       );
       return;
     }
-    if (meterValueDto.transactionDatabaseId) {
+    if (meterValueDto.transactionId) {
       this._logger.debug(
-        `Meter Value belongs to Transaction: ${meterValueDto.transactionDatabaseId}`,
+        `Meter Value belongs to Transaction: ${meterValueDto.transactionId}`,
       );
       if (!meterValueDto.tariffId) {
         this._logger.warn(
-          `Tariff ID missing in Meter Value notification for Transaction ${meterValueDto.transactionDatabaseId}, cannot broadcast.`,
+          `Tariff ID missing in Meter Value notification for Transaction ${meterValueDto.transactionId}, cannot broadcast.`,
         );
         return;
       }
@@ -209,7 +209,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         await this.isTransactionBeginMeterValue(meterValueDto);
       if (isTransactionBegin) {
         this._logger.debug(
-          `Skipping Transaction.Begin meter value for Transaction ${meterValueDto.transactionDatabaseId} to prevent race condition`,
+          `Skipping Transaction.Begin meter value for Transaction ${meterValueDto.transactionId} to prevent race condition`,
         );
         return;
       }

@@ -129,10 +129,10 @@ export abstract class BaseTransactionMapper {
     const transactionIdToOcpiTariffMap = new Map<string, OcpiTariff>();
     await Promise.all(
       sessions
-        .filter((session) => transactionIdToTariffMap.get(session.transaction_id))
+        .filter((session) => transactionIdToTariffMap.get(session.id))
         .map(async (session) => {
           const tariffVariables = {
-            id: transactionIdToTariffMap.get(session.transaction_id)!.id!,
+            id: transactionIdToTariffMap.get(session.id)!.id!,
             // TODO: Ensure CPO Country Code, Party ID exists for the tariff in question
             countryCode: session.country_code,
             partyId: session.party_id,
@@ -144,7 +144,7 @@ export abstract class BaseTransactionMapper {
           const tariff = result.Tariffs[0] as ITariffDto;
           if (tariff) {
             transactionIdToOcpiTariffMap.set(
-              session.transaction_id,
+              session.id,
               TariffMapper.map(tariff),
             );
           }

@@ -826,7 +826,7 @@ export type GetTransactionsQueryResult = {
 };
 
 export type GetTransactionByTransactionIdQueryVariables = Exact<{
-  transactionId: Scalars['Int']['input'];
+  transactionId: Scalars['String']['input'];
 }>;
 
 
@@ -856,6 +856,8 @@ export type GetTransactionByTransactionIdQueryResult = {
       partyId: string
     },
     authorization?: {
+      idToken: string,
+      additionalInfo?: any | null,
       tenantPartner?: {
         id: number,
         countryCode: string,
