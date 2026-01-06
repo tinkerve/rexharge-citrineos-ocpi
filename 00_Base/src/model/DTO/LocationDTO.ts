@@ -15,6 +15,7 @@ import { HoursSchema } from '../Hours';
 import { EnergyMixSchema } from '../EnergyMix';
 import { OcpiResponseSchema } from '../OcpiResponse';
 import { PaginatedResponseSchema } from '../PaginatedResponse';
+import { OcpiDateTimeSchema } from '../OcpiDateTime';
 
 export const LocationDTOSchema = z.object({
   country_code: z.string().min(2).max(2),
@@ -42,7 +43,7 @@ export const LocationDTOSchema = z.object({
   charging_when_closed: z.null().optional(),
   images: z.null().optional(),
   energy_mix: EnergyMixSchema.nullable().optional(),
-  last_updated: z.coerce.date(),
+  last_updated: OcpiDateTimeSchema,
 });
 
 export const LocationResponseSchema = OcpiResponseSchema(LocationDTOSchema);

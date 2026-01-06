@@ -4,9 +4,10 @@
 
 import { z } from 'zod';
 import { ChargingProfilePeriodSchema } from './ChargingProfilePeriod';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export const ChargingProfileSchema = z.object({
-  start_date_time: z.coerce.date().nullable().optional(),
+  start_date_time: OcpiDateTimeSchema.nullable().optional(),
   duration: z.number().int().nullable().optional(),
   charging_rate_unit: z.string(),
   min_charging_rate: z.number().nullable().optional(),

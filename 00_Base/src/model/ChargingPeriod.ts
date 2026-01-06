@@ -4,9 +4,10 @@
 
 import { z } from 'zod';
 import { CdrDimensionSchema } from './CdrDimension';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export const ChargingPeriodSchema = z.object({
-  start_date_time: z.coerce.date(),
+  start_date_time: OcpiDateTimeSchema,
   dimensions: z.array(CdrDimensionSchema).min(1),
   tariff_id: z.string().max(36).nullable().optional(),
 });

@@ -31,6 +31,7 @@ import { Logger } from 'tslog';
 import { ParkingType } from '../model/ParkingType';
 import { Facilities } from '../model/Facilities';
 import { Hours } from '../model/Hours';
+import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
 export class LocationMapper {
   static fromGraphql(location: ILocationDto): LocationDTO {
@@ -63,7 +64,7 @@ export class LocationMapper {
       opening_times: location.openingHours
         ? LocationMapper.mapLocationHours(location.openingHours)
         : undefined,
-      last_updated: location.updatedAt!,
+      last_updated: toISOStringIfNeeded(location.updatedAt, true),
     };
   }
 
@@ -98,7 +99,7 @@ export class LocationMapper {
       opening_times: location.openingHours
         ? LocationMapper.mapLocationHours(location.openingHours)
         : undefined,
-      last_updated: location.updatedAt!,
+      last_updated: toISOStringIfNeeded(location.updatedAt, true),
     };
   }
 
@@ -242,7 +243,7 @@ export class EvseMapper {
         .filter((r) => r !== null),
       connectors: connectors || [],
       floor_level: station.floorLevel,
-      last_updated: evse.updatedAt!,
+      last_updated: toISOStringIfNeeded(evse.updatedAt, true),
     };
   }
 
@@ -278,7 +279,7 @@ export class EvseMapper {
         .filter((r) => r !== null),
       connectors: connectors,
       floor_level: station.floorLevel,
-      last_updated: evse.updatedAt!,
+      last_updated: toISOStringIfNeeded(evse.updatedAt),
     };
   }
 
@@ -394,7 +395,7 @@ export class ConnectorMapper {
       max_electric_power: connector.maximumPowerWatts || undefined,
       tariff_ids: connector.tariffs?.map((t) => t.id!.toString()),
       terms_and_conditions: connector.termsAndConditionsUrl,
-      last_updated: connector.updatedAt!,
+      last_updated: toISOStringIfNeeded(connector.updatedAt, true),
     };
     if (ConnectorMapper.validatePartialConnector(partialConnector)) {
       return partialConnector as ConnectorDTO;
@@ -405,7 +406,6 @@ export class ConnectorMapper {
   static fromPartialGraphql(
     connector: Partial<IConnectorDto>,
   ): Partial<ConnectorDTO> {
-    const logger = Container.get(Logger);
     const partialConnector: Partial<ConnectorDTO> = {
       standard: ConnectorMapper.mapConnectorType(connector.type),
       format: ConnectorMapper.mapConnectorFormat(connector.format),
@@ -415,7 +415,7 @@ export class ConnectorMapper {
       max_electric_power: connector.maximumPowerWatts || undefined,
       tariff_ids: connector.tariffs?.map((t) => t.id!.toString()),
       terms_and_conditions: connector.termsAndConditionsUrl,
-      last_updated: connector.updatedAt!,
+      last_updated: toISOStringIfNeeded(connector.updatedAt),
     };
     return partialConnector;
   }

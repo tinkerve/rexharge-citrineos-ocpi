@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export const OcpiLocationSchema = z.object({
   coreLocationId: z.number().int(),
   publish: z.boolean(),
-  lastUpdated: z.coerce.date(),
+  lastUpdated: OcpiDateTimeSchema,
   partyId: z.string().length(3),
   countryCode: z.string().length(2),
   timeZone: z.string(),

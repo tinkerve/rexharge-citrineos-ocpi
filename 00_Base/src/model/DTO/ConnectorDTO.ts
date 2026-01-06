@@ -8,6 +8,7 @@ import { ConnectorFormat } from '../ConnectorFormat';
 import { PowerType } from '../PowerType';
 import { OcpiResponseSchema } from '../OcpiResponse';
 import { uidDelimiter } from './EvseDTO';
+import { OcpiDateTimeSchema } from '../OcpiDateTime';
 
 export const ConnectorDTOSchema = z.object({
   id: z.string().max(36),
@@ -19,7 +20,7 @@ export const ConnectorDTOSchema = z.object({
   max_electric_power: z.number().int().nullable().optional(),
   tariff_ids: z.array(z.string()).nullable().optional(),
   terms_and_conditions: z.string().url().nullable().optional(),
-  last_updated: z.coerce.date(),
+  last_updated: OcpiDateTimeSchema,
 });
 
 export const ConnectorResponseSchema = OcpiResponseSchema(ConnectorDTOSchema);

@@ -293,7 +293,10 @@ export class TokensService {
     }
 
     return {
-      timestamp: postTokenResult.timestamp.toISOString(),
+      timestamp:
+        typeof postTokenResult.timestamp === 'string'
+          ? postTokenResult.timestamp
+          : (postTokenResult.timestamp as Date).toISOString(),
       data: {
         allowed: postTokenResult.data!.allowed,
         reason: postTokenResult.data!.info?.text,

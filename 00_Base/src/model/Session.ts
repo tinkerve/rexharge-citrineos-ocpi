@@ -10,14 +10,15 @@ import { OcpiResponseSchema } from './OcpiResponse';
 import { PriceSchema } from './Price';
 import { ChargingPeriodSchema } from './ChargingPeriod';
 import { CdrTokenSchema } from './CdrToken';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export const SessionSchema = z.object({
   country_code: z.string().min(2).max(2),
   party_id: z.string().max(3),
   id: z.string().max(36),
   transaction_id: z.string().max(36),
-  start_date_time: z.coerce.date(),
-  end_date_time: z.coerce.date().nullable().optional(),
+  start_date_time: OcpiDateTimeSchema,
+  end_date_time: OcpiDateTimeSchema.nullable().optional(),
   kwh: z.number(),
   cdr_token: CdrTokenSchema,
   auth_method: z.nativeEnum(AuthMethod),
@@ -30,7 +31,7 @@ export const SessionSchema = z.object({
   charging_periods: z.array(ChargingPeriodSchema).optional().nullable(),
   total_cost: PriceSchema.optional().nullable(),
   status: z.nativeEnum(SessionStatus),
-  last_updated: z.coerce.date(),
+  last_updated: OcpiDateTimeSchema,
 });
 
 export type Session = z.infer<typeof SessionSchema>;

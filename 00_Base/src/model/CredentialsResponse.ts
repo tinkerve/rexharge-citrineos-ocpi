@@ -20,5 +20,5 @@ export const buildCredentialsResponse = (
   status_code,
   status_message,
   data,
-  timestamp: new Date(),
+  timestamp: new Date().toISOString(),
 });

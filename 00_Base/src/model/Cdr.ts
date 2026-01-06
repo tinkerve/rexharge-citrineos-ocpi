@@ -11,13 +11,14 @@ import { ChargingPeriodSchema } from './ChargingPeriod';
 import { SignedDataSchema } from './SignedData';
 import { PriceSchema } from './Price';
 import { OcpiResponseStatusCode } from './OcpiResponse';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export const CdrSchema = z.object({
   country_code: z.string().length(2),
   party_id: z.string().max(3),
   id: z.string().max(39),
-  start_date_time: z.coerce.date(),
-  end_date_time: z.coerce.date(),
+  start_date_time: OcpiDateTimeSchema,
+  end_date_time: OcpiDateTimeSchema,
   session_id: z.string().max(36).nullable().optional(),
   cdr_token: CdrTokenSchema,
   auth_method: z.nativeEnum(AuthMethod),
@@ -42,7 +43,7 @@ export const CdrSchema = z.object({
   credit: z.boolean().nullable().optional(),
   credit_reference_id: z.string().max(39).nullable().optional(),
   home_charging_compensation: z.boolean().nullable().optional(),
-  last_updated: z.coerce.date(),
+  last_updated: OcpiDateTimeSchema,
 });
 
 export type Cdr = z.infer<typeof CdrSchema>;
@@ -50,7 +51,7 @@ export type Cdr = z.infer<typeof CdrSchema>;
 export const CdrResponseSchema = z.object({
   status_code: z.nativeEnum(OcpiResponseStatusCode),
   status_message: z.string().optional(),
-  timestamp: z.coerce.date(),
+  timestamp: OcpiDateTimeSchema,
   data: CdrSchema,
 });
 
@@ -59,7 +60,7 @@ export type CdrResponse = z.infer<typeof CdrResponseSchema>;
 export const PaginatedCdrResponseSchema = z.object({
   status_code: z.nativeEnum(OcpiResponseStatusCode),
   status_message: z.string().optional(),
-  timestamp: z.coerce.date(),
+  timestamp: OcpiDateTimeSchema,
   total: z.number().int().nonnegative(),
   offset: z.number().int().nonnegative(),
   limit: z.number().int().min(0).max(200),

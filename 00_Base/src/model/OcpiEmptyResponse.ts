@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { OcpiResponseStatusCode } from './OcpiResponse';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export const OcpiEmptyResponseSchema = z
   .object({
@@ -11,7 +12,7 @@ export const OcpiEmptyResponseSchema = z
       .nativeEnum(OcpiResponseStatusCode)
       .default(OcpiResponseStatusCode.GenericSuccessCode),
     status_message: z.string().optional(),
-    timestamp: z.coerce.date(),
+    timestamp: OcpiDateTimeSchema,
     data: z.union([z.undefined(), z.null(), z.any()]).optional(),
   })
   .nullable();
@@ -24,6 +25,6 @@ export const buildOcpiEmptyResponse = (
 ): OcpiEmptyResponse => {
   return {
     status_code,
-    timestamp: new Date(),
+    timestamp: new Date().toISOString(),
   };
 };

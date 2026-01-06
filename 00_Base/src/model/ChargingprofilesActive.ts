@@ -4,9 +4,10 @@
 
 import { z } from 'zod';
 import { ActiveChargingProfileSchema } from './ActiveChargingProfile';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export const ChargingprofilesActiveSchema = z.object({
-  start_date_time: z.coerce.date(),
+  start_date_time: OcpiDateTimeSchema,
   charging_profile: ActiveChargingProfileSchema,
 });
 

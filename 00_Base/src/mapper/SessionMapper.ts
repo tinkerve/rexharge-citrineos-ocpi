@@ -23,6 +23,7 @@ import {
   ITransactionEventDto,
   IMeterValueDto,
 } from '@citrineos/base';
+import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
 @Service()
 export class SessionMapper extends BaseTransactionMapper {
@@ -180,13 +181,13 @@ export class SessionMapper extends BaseTransactionMapper {
 
     if (transaction.startTime !== undefined) {
       session.start_date_time = transaction.startTime
-        ? new Date(transaction.startTime)
+        ? toISOStringIfNeeded(transaction.startTime)
         : undefined;
     }
 
     if (transaction.endTime !== undefined) {
       session.end_date_time = transaction.endTime
-        ? new Date(transaction.endTime)
+        ? toISOStringIfNeeded(transaction.endTime)
         : null;
     }
 
@@ -195,7 +196,7 @@ export class SessionMapper extends BaseTransactionMapper {
     }
 
     if (transaction.updatedAt !== undefined) {
-      session.last_updated = transaction.updatedAt!;
+      session.last_updated = toISOStringIfNeeded(transaction.updatedAt);
     }
 
     // Map context-dependent fields if available
@@ -273,13 +274,13 @@ export class SessionMapper extends BaseTransactionMapper {
 
     if (transaction.startTime !== undefined) {
       session.start_date_time = transaction.startTime
-        ? new Date(transaction.startTime)
+        ? toISOStringIfNeeded(transaction.startTime)
         : undefined;
     }
 
     if (transaction.endTime !== undefined) {
       session.end_date_time = transaction.endTime
-        ? new Date(transaction.endTime)
+        ? toISOStringIfNeeded(transaction.endTime)
         : null;
     }
 
@@ -288,7 +289,7 @@ export class SessionMapper extends BaseTransactionMapper {
     }
 
     if (transaction.updatedAt !== undefined) {
-      session.last_updated = transaction.updatedAt!;
+      session.last_updated = toISOStringIfNeeded(transaction.updatedAt);
     }
 
     if (transaction.evseId && transaction.stationId) {
@@ -325,14 +326,16 @@ export class SessionMapper extends BaseTransactionMapper {
       transaction_id: transaction.transactionId,
       id: transaction.id!.toString(),
       start_date_time: transaction.startTime
-        ? new Date(transaction.startTime)
+        ? toISOStringIfNeeded(transaction.startTime, true)
         : (() => {
             this.logger.error(
               `Transaction ${transaction.transactionId} has no startTime. Using createdAt as placeholder.`,
             );
-            return transaction.createdAt!;
+            return toISOStringIfNeeded(transaction.createdAt!, true);
           })(),
-      end_date_time: transaction.endTime ? new Date(transaction.endTime) : null,
+      end_date_time: transaction.endTime
+        ? toISOStringIfNeeded(transaction.endTime)
+        : null,
       kwh: transaction.totalKwh || 0,
       cdr_token: this.createCdrToken(token),
       // TODO: Implement other auth methods
@@ -346,7 +349,7 @@ export class SessionMapper extends BaseTransactionMapper {
         String(tariff?.id),
       ),
       status: this.getTransactionStatus(transaction),
-      last_updated: transaction.updatedAt!,
+      last_updated: toISOStringIfNeeded(transaction.updatedAt!, true),
       // TODO: Fill in optional values
       authorization_reference: null,
       total_cost: transaction.endTime
@@ -422,7 +425,7 @@ export class SessionMapper extends BaseTransactionMapper {
     previousMeterValue?: IMeterValueDto,
   ): ChargingPeriod {
     return {
-      start_date_time: new Date(meterValue.timestamp),
+      start_date_time: toISOStringIfNeeded(meterValue.timestamp, true),
       dimensions: this.getCdrDimensions(meterValue, previousMeterValue),
       tariff_id: tariffId,
     };

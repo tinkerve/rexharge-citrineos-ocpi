@@ -11,6 +11,7 @@ import { GeoLocationSchema } from '../GeoLocation';
 import { DisplayTextSchema } from '../DisplayText';
 import { ParkingRestriction } from '../ParkingRestriction';
 import { OcpiResponseSchema } from '../OcpiResponse';
+import { OcpiDateTimeSchema } from '../OcpiDateTime';
 
 // TODO make dynamic
 export const uidDelimiter = '::';
@@ -45,7 +46,7 @@ export const EvseDTOSchema = z.object({
     .nullable()
     .optional(),
   images: z.null().optional(),
-  last_updated: z.coerce.date(),
+  last_updated: OcpiDateTimeSchema,
 });
 
 export const EvseResponseSchema = OcpiResponseSchema(EvseDTOSchema);

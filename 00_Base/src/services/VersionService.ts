@@ -36,7 +36,7 @@ export class VersionService {
         url: version.versionDetailsUrl!,
       })),
       status_code: OcpiResponseStatusCode.GenericSuccessCode,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -72,7 +72,7 @@ export class VersionService {
           }) || [],
       },
       status_code: OcpiResponseStatusCode.GenericSuccessCode,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
   }
 }

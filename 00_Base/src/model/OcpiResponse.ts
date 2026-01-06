@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
+import { OcpiDateTimeSchema } from './OcpiDateTime';
 
 export enum OcpiResponseStatusCode {
   GenericSuccessCode = 1000,
@@ -25,7 +26,7 @@ export const OcpiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
   z.object({
     status_code: z.nativeEnum(OcpiResponseStatusCode),
     status_message: z.string().optional(),
-    timestamp: z.coerce.date(),
+    timestamp: OcpiDateTimeSchema,
     data: dataSchema.optional(),
   });
 
@@ -37,5 +38,5 @@ export const buildOcpiResponse = <T>(
   status_code,
   status_message,
   data,
-  timestamp: new Date(),
+  timestamp: new Date().toISOString(),
 });

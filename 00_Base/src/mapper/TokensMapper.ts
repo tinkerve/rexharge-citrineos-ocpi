@@ -13,6 +13,7 @@ import { TokenType } from '../model/TokenType';
 
 import { TokenDTO } from '../model/DTO/TokenDTO';
 import { WhitelistType } from '../model/WhitelistType';
+import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
 export class TokensMapper {
   public static toDto(authorization: IAuthorizationDto): TokenDTO {
@@ -32,7 +33,7 @@ export class TokensMapper {
       language: authorization.language1,
       // default_profile_type: token.default_profile_type,
       // energy_contract: token.energy_contract,
-      last_updated: authorization.updatedAt!,
+      last_updated: toISOStringIfNeeded(authorization.updatedAt, true),
     };
 
     return tokenDto;

@@ -33,7 +33,7 @@ export const buildOcpiPaginatedResponse = <T extends z.ZodTypeAny>(
   return {
     status_code,
     status_message,
-    timestamp: new Date(),
+    timestamp: new Date().toISOString(),
     data,
     total,
     limit,

@@ -8,6 +8,7 @@ import { WhitelistType } from '../WhitelistType';
 import { OcpiResponseSchema } from '../OcpiResponse';
 import { PaginatedResponseSchema } from '../PaginatedResponse';
 import { TokenEnergyContractSchema } from '../TokenEnergyContract';
+import { OcpiDateTimeSchema } from '../OcpiDateTime';
 
 export const TokenDTOSchema = z.object({
   country_code: z.string().length(2),
@@ -23,7 +24,7 @@ export const TokenDTOSchema = z.object({
   language: z.string().length(2).nullable().optional(),
   default_profile_type: z.string().nullable().optional(),
   energy_contract: TokenEnergyContractSchema.nullable().optional(),
-  last_updated: z.coerce.date(),
+  last_updated: OcpiDateTimeSchema,
 });
 export const TokenDTOSchemaName = 'TokenDTOSchema';
 

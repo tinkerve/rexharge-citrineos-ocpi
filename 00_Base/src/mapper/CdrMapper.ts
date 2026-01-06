@@ -16,6 +16,7 @@ import { ILogObj, Logger } from 'tslog';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import { LocationsService } from '../services/LocationsService';
 import { ITariffDto, ITransactionDto } from '@citrineos/base';
+import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
 @Service()
 export class CdrMapper extends BaseTransactionMapper {
@@ -101,8 +102,8 @@ export class CdrMapper extends BaseTransactionMapper {
       country_code: session.country_code,
       party_id: session.party_id,
       id: this.generateCdrId(session),
-      start_date_time: session.start_date_time,
-      end_date_time: session.end_date_time!,
+      start_date_time: toISOStringIfNeeded(session.start_date_time, true),
+      end_date_time: toISOStringIfNeeded(session.end_date_time, true),
       session_id: session.id,
       cdr_token: session.cdr_token,
       auth_method: session.auth_method,
@@ -130,7 +131,7 @@ export class CdrMapper extends BaseTransactionMapper {
       invoice_reference_id: await this.generateInvoiceReferenceId(session),
       credit: this.isCredit(session, tariff),
       credit_reference_id: this.generateCreditReferenceId(session, tariff),
-      last_updated: session.last_updated,
+      last_updated: toISOStringIfNeeded(session.last_updated, true),
     };
   }
 
@@ -224,7 +225,8 @@ export class CdrMapper extends BaseTransactionMapper {
   private calculateTotalTime(session: Session): number {
     if (session.end_date_time) {
       return (
-        (session.end_date_time.getTime() - session.start_date_time.getTime()) /
+        (new Date(session.end_date_time).getTime() -
+          new Date(session.start_date_time).getTime()) /
         3600000
       ); // Convert ms to hours
     }

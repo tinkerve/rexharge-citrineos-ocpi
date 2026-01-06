@@ -5,13 +5,14 @@
 import { z } from 'zod';
 import { DEFAULT_LIMIT, DEFAULT_OFFSET } from '../../model/PaginatedResponse';
 import { OcpiParamsSchema } from '../util/OcpiParams';
+import { OcpiDateTimeSchema } from '../../model/OcpiDateTime';
 import { v4 as uuidv4 } from 'uuid';
 
 export const PaginatedOcpiParamsSchema = OcpiParamsSchema.extend({
   offset: z.number().int().min(0).optional().default(DEFAULT_OFFSET),
   limit: z.number().int().min(1).optional().default(DEFAULT_LIMIT),
-  date_from: z.union([z.coerce.date(), z.string(), z.undefined()]).optional(),
-  date_to: z.union([z.coerce.date(), z.string(), z.undefined()]).optional(),
+  date_from: z.union([OcpiDateTimeSchema, z.undefined()]).optional(),
+  date_to: z.union([OcpiDateTimeSchema, z.undefined()]).optional(),
 });
 
 export type PaginatedOcpiParams = z.infer<typeof PaginatedOcpiParamsSchema>;

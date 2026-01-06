@@ -65,7 +65,7 @@ export class CdrsModuleApi extends BaseController implements ICdrsModuleApi {
     // TODO: need to append to header
 
     return {
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       status_code: OcpiResponseStatusCode.GenericSuccessCode,
       ...cdrs,
     };

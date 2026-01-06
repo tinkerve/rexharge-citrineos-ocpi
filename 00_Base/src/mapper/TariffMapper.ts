@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Service } from 'typedi';
 import { TariffDTO } from '../model/DTO/tariffs/TariffDTO';
 import { TariffDimensionType } from '../model/TariffDimensionType';
 import { TariffElement } from '../model/TariffElement';
 import { TariffType } from '../model/TariffType';
 import { MINUTES_IN_HOUR } from '../util/Consts';
 import { ITariffDto } from '@citrineos/base';
+import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
 export class TariffMapper {
   constructor() {}
@@ -30,7 +30,7 @@ export class TariffMapper {
       energy_mix: undefined,
       start_date_time: undefined,
       end_date_time: undefined,
-      last_updated: coreTariff.updatedAt!,
+      last_updated: toISOStringIfNeeded(coreTariff.updatedAt, true),
     };
   }
   private static getTariffElement(

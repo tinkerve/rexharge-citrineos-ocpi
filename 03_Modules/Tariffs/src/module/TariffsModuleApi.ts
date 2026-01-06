@@ -4,40 +4,23 @@
 
 import { ITariffsModuleApi } from './ITariffsModuleApi';
 
-import {
-  Ctx,
-  Delete,
-  Get,
-  JsonController,
-  Param,
-  Put,
-} from 'routing-controllers';
+import { Ctx, Get, JsonController } from 'routing-controllers';
 
 import { HttpStatus, ITenantPartnerDto } from '@citrineos/base';
 import {
   AsOcpiFunctionalEndpoint,
   BaseController,
-  BodyWithSchema,
-  buildOcpiEmptyResponse,
-  buildOcpiErrorResponse,
   DEFAULT_LIMIT,
   DEFAULT_OFFSET,
-  FunctionalEndpointParams,
   generateMockForSchema,
   ModuleId,
-  OcpiEmptyResponse,
-  OcpiErrorResponse,
   OcpiResponseStatusCode,
   Paginated,
   PaginatedParams,
   PaginatedTariffResponse,
   PaginatedTariffResponseSchema,
   PaginatedTariffResponseSchemaName,
-  PutTariffRequest,
-  PutTariffRequestSchema,
-  PutTariffRequestSchemaName,
   ResponseSchema,
-  TariffDTO,
   TariffsService,
   versionIdParam,
   VersionNumber,
@@ -98,7 +81,7 @@ export class TariffsModuleApi
       offset: paginationParams?.offset || DEFAULT_OFFSET,
       limit: paginationParams?.limit || DEFAULT_LIMIT,
       status_code: OcpiResponseStatusCode.GenericSuccessCode,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
   }
 

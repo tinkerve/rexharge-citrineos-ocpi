@@ -27,6 +27,7 @@ import {
 } from '../mapper/LocationMapper';
 import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
 import { EvseStatus } from '../model/EvseStatus';
+import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
 @Service()
 export class LocationsBroadcaster extends BaseBroadcaster {
@@ -102,7 +103,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(evseDto.stationId!, evseDto.id!)}`;
     const evseData: Partial<EvseDTO> = {
       status: aggregatedStatus,
-      last_updated: evseDto.updatedAt,
+      last_updated: toISOStringIfNeeded(evseDto.updatedAt),
     };
     await this.broadcastEvse(tenant, evseData, HttpMethod.Patch, path);
   }

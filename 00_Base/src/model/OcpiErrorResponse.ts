@@ -2,7 +2,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { IsDateString, IsInt, IsNotEmpty, IsString, Max, Min, ValidateNested } from 'class-validator';
+import {
+  IsDateString,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Optional } from '../util/decorators/Optional';
 import { OcpiResponseStatusCode } from './OcpiResponse';
 
@@ -23,7 +31,7 @@ export class OcpiErrorResponse {
   @IsString()
   @IsDateString()
   @IsNotEmpty()
-  timestamp!: Date;
+  timestamp!: string;
 }
 
 export const buildOcpiErrorResponse = (
@@ -33,6 +41,6 @@ export const buildOcpiErrorResponse = (
   const response = new OcpiErrorResponse();
   response.status_code = status_code;
   response.status_message = status_message;
-  response.timestamp = new Date();
+  response.timestamp = new Date().toISOString();
   return response;
 };

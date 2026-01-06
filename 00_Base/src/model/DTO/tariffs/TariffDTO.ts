@@ -9,6 +9,7 @@ import { PriceSchema } from '../../Price';
 import { TariffElementSchema } from '../../TariffElement';
 import { EnergyMixSchema } from '../../EnergyMix';
 import { PaginatedResponseSchema } from '../../PaginatedResponse';
+import { OcpiDateTimeSchema } from '../../OcpiDateTime';
 
 export const TariffDTOSchema = z.object({
   id: z.string().max(36),
@@ -22,9 +23,9 @@ export const TariffDTOSchema = z.object({
   max_price: PriceSchema.nullable().optional(),
   elements: z.array(TariffElementSchema).min(1),
   energy_mix: EnergyMixSchema.nullable().optional(),
-  start_date_time: z.coerce.date().nullable().optional(),
-  end_date_time: z.coerce.date().nullable().optional(),
-  last_updated: z.coerce.date(),
+  start_date_time: OcpiDateTimeSchema.nullable().optional(),
+  end_date_time: OcpiDateTimeSchema.nullable().optional(),
+  last_updated: OcpiDateTimeSchema,
 });
 
 export type TariffDTO = z.infer<typeof TariffDTOSchema>;
