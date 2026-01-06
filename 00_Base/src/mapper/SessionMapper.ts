@@ -353,7 +353,9 @@ export class SessionMapper extends BaseTransactionMapper {
       authorization_reference: null,
       total_cost: transaction.endTime
         ? this.calculateTotalCost(transaction.totalKwh || 0, tariff.pricePerKwh)
-        : null,
+        : {
+            excl_vat: 0,
+          },
       meter_id: null,
     };
   }
