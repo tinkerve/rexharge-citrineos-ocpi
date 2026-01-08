@@ -51,6 +51,14 @@ export function createDockerOcpiConfig(): OcpiConfigInput {
       password: process.env.DB_PASS || 'citrine',
     },
 
+    rexhargeGatewayDatabase: {
+      host: process.env.REXHARGE_GATEWAY_DB_HOST || 'rexharge-gateway-db',
+      port: parseInt(process.env.REXHARGE_GATEWAY_DB_PORT || '5432'),
+      database: process.env.REXHARGE_GATEWAY_DB_NAME || 'rexharge_gateway',
+      username: process.env.REXHARGE_GATEWAY_DB_USER || 'rexharge',
+      password: process.env.REXHARGE_GATEWAY_DB_PASS || 'rexharge',
+    },
+
     cache: {
       ...(process.env.REDIS_HOST
         ? {

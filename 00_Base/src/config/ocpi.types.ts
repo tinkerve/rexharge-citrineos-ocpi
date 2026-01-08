@@ -95,6 +95,15 @@ export const ocpiConfigInputSchema = z.object({
     password: z.string().default('').optional(),
   }),
 
+  // Rexharge Gateway Database configuration
+  rexhargeGatewayDatabase: z.object({
+    host: z.string().default('localhost').optional(),
+    port: z.number().int().positive().default(5432).optional(),
+    database: z.string().optional(),
+    username: z.string().optional(),
+    password: z.string().optional(),
+  }),
+
   // Cache configuration (required for OCPI token caching)
   cache: z
     .object({
@@ -247,6 +256,14 @@ export const ocpiConfigSchema = z.object({
   }),
 
   database: z.object({
+    host: z.string(),
+    port: z.number().int().positive(),
+    database: z.string(),
+    username: z.string(),
+    password: z.string(),
+  }),
+
+  rexhargeGatewayDatabase: z.object({
     host: z.string(),
     port: z.number().int().positive(),
     database: z.string(),

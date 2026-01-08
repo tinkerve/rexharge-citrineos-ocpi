@@ -51,6 +51,14 @@ export function createLocalOcpiConfig(): OcpiConfigInput {
       password: process.env.DB_PASS || 'postgres',
     },
 
+    rexhargeGatewayDatabase: {
+      host: process.env.REXHARGE_GATEWAY_DB_HOST || 'localhost',
+      port: parseInt(process.env.REXHARGE_GATEWAY_DB_PORT || '5432'),
+      database: process.env.REXHARGE_GATEWAY_DB_NAME || 'rexharge_db',
+      username: process.env.REXHARGE_GATEWAY_DB_USER || 'postgres',
+      password: process.env.REXHARGE_GATEWAY_DB_PASS || 'postgres',
+    },
+
     cache: {
       memory: true,
     },
@@ -66,7 +74,8 @@ export function createLocalOcpiConfig(): OcpiConfigInput {
     commands: {
       timeout: parseInt(process.env.COMMANDS_TIMEOUT || '30'),
       ocpiBaseUrl:
-        process.env.COMMANDS_OCPI_BASE_URL || 'http://localhost:8085/ocpi',
+        process.env.COMMANDS_OCPI_BASE_URL ||
+        'http://host.docker.internal:8085/ocpi',
       coreHeaders: JSON.parse(process.env.COMMANDS_CORE_HEADERS || '{}'),
       ocpp1_6: {
         remoteStartTransactionRequestUrl:

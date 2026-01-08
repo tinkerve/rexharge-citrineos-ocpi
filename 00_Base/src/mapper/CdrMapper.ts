@@ -15,6 +15,7 @@ import { BaseTransactionMapper } from './BaseTransactionMapper';
 import { ILogObj, Logger } from 'tslog';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import { LocationsService } from '../services/LocationsService';
+import { ExternalDatabaseService } from '../services/ExternalDatabaseService';
 import { ITariffDto, ITransactionDto } from '@citrineos/base';
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
@@ -24,9 +25,10 @@ export class CdrMapper extends BaseTransactionMapper {
     protected logger: Logger<ILogObj>,
     protected locationsService: LocationsService,
     protected ocpiGraphqlClient: OcpiGraphqlClient,
+    protected externalDatabaseService: ExternalDatabaseService,
     readonly sessionMapper: SessionMapper,
   ) {
-    super(logger, locationsService, ocpiGraphqlClient);
+    super(logger, locationsService, ocpiGraphqlClient, externalDatabaseService);
   }
 
   public async mapTransactionsToCdrs(

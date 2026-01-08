@@ -400,6 +400,22 @@ export type GetConnectorByIdQueryResult = {
   }>
 };
 
+export type GetStatusNotificationsInRangeQueryVariables = Exact<{
+  stationId: Scalars['String']['input'];
+  connectorId: Scalars['Int']['input'];
+  tenantId: Scalars['Int']['input'];
+  start: Scalars['timestamptz']['input'];
+  end: Scalars['timestamptz']['input'];
+}>;
+
+
+export type GetStatusNotificationsInRangeQueryResult = {
+  StatusNotifications: Array<{
+    timestamp?: any | null,
+    connectorStatus?: string | null
+  }>
+};
+
 export type GetTariffByKeyQueryVariables = Exact<{
   id: Scalars['Int']['input'];
   countryCode: Scalars['String']['input'];

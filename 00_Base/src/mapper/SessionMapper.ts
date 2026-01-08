@@ -15,6 +15,7 @@ import { CdrDimension } from '../model/CdrDimension';
 import { TokenDTO } from '../model/DTO/TokenDTO';
 import { BaseTransactionMapper } from './BaseTransactionMapper';
 import { LocationsService } from '../services/LocationsService';
+import { ExternalDatabaseService } from '../services/ExternalDatabaseService';
 import { LocationDTO } from '../model/DTO/LocationDTO';
 import { UID_FORMAT } from '../model/DTO/EvseDTO';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
@@ -31,8 +32,9 @@ export class SessionMapper extends BaseTransactionMapper {
     protected logger: Logger<ILogObj>,
     protected locationsService: LocationsService,
     protected ocpiGraphqlClient: OcpiGraphqlClient,
+    protected externalDatabaseService: ExternalDatabaseService,
   ) {
-    super(logger, locationsService, ocpiGraphqlClient);
+    super(logger, locationsService, ocpiGraphqlClient, externalDatabaseService);
   }
 
   /**
@@ -59,7 +61,7 @@ export class SessionMapper extends BaseTransactionMapper {
       );
     }
 
-    return this.mapTransactionWithContextToSession(
+    return await this.mapTransactionWithContextToSession(
       transaction,
       location,
       token,
@@ -89,7 +91,7 @@ export class SessionMapper extends BaseTransactionMapper {
       const token = tokenMap.get(transaction.transactionId);
       const tariff = tariffMap.get(transaction.transactionId);
 
-      return this.mapPartialTransactionWithContext(
+      return await this.mapPartialTransactionWithContext(
         transaction,
         location,
         token,
@@ -149,7 +151,7 @@ export class SessionMapper extends BaseTransactionMapper {
 
       if (location && token && tariff) {
         result.push(
-          this.mapTransactionWithContextToSession(
+          await this.mapTransactionWithContextToSession(
             transaction,
             location,
             token,
@@ -166,12 +168,12 @@ export class SessionMapper extends BaseTransactionMapper {
   /**
    * Maps a partial transaction with available context data
    */
-  private mapPartialTransactionWithContext(
+  private async mapPartialTransactionWithContext(
     transaction: Partial<ITransactionDto>,
     location?: LocationDTO,
     token?: TokenDTO,
     tariff?: ITariffDto,
-  ): Partial<Session> {
+  ): Promise<Partial<Session>> {
     const session: Partial<Session> = {};
 
     // Map basic transaction fields
@@ -218,11 +220,10 @@ export class SessionMapper extends BaseTransactionMapper {
         transaction.endTime !== undefined
       ) {
         session.total_cost = transaction.endTime
-          ? this.calculateTotalCost(
-              transaction.totalKwh || 0,
-              tariff.pricePerKwh,
-            )
-          : null;
+          ? await this.calculateTotalCostFromDatabase(transaction, tariff)
+          : {
+              excl_vat: 0,
+            };
       }
     }
 
@@ -314,12 +315,12 @@ export class SessionMapper extends BaseTransactionMapper {
     return session;
   }
 
-  private mapTransactionWithContextToSession(
+  private async mapTransactionWithContextToSession(
     transaction: ITransactionDto,
     location: LocationDTO,
     token: TokenDTO,
     tariff: ITariffDto,
-  ): Session {
+  ): Promise<Session> {
     return {
       country_code: location.country_code,
       party_id: location.party_id,
@@ -352,7 +353,7 @@ export class SessionMapper extends BaseTransactionMapper {
       // TODO: Fill in optional values
       authorization_reference: null,
       total_cost: transaction.endTime
-        ? this.calculateTotalCost(transaction.totalKwh || 0, tariff.pricePerKwh)
+        ? await this.calculateTotalCostFromDatabase(transaction, tariff)
         : {
             excl_vat: 0,
           },
