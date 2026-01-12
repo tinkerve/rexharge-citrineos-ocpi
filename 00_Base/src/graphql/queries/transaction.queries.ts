@@ -62,9 +62,9 @@ export const GET_TRANSACTIONS_QUERY = gql`
   }
 `;
 
-export const GET_TRANSACTION_BY_TRANSACTION_ID_QUERY = gql`
-  query GetTransactionByTransactionId($transactionId: String!) {
-    Transactions(where: { transactionId: { _eq: $transactionId } }) {
+export const GET_TRANSACTION_BY_ID_QUERY = gql`
+  query GetTransactionByTransactionId($id: Int!) {
+    Transactions(where: { id: { _eq: $id } }) {
       tenant: Tenant {
         countryCode
         partyId

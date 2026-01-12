@@ -24,7 +24,7 @@ import {
   GetTransactionByTransactionIdQueryVariables,
 } from '../graphql/operations';
 import { GET_CHARGING_STATION_BY_ID_QUERY } from '../graphql/queries/chargingStation.queries';
-import { GET_TRANSACTION_BY_TRANSACTION_ID_QUERY } from '../graphql/queries/transaction.queries';
+import { GET_TRANSACTION_BY_ID_QUERY } from '../graphql/queries/transaction.queries';
 import { EXTRACT_STATION_ID } from '../model/DTO/EvseDTO';
 import { TokenDTO } from '../model/DTO/TokenDTO';
 import { TokensService } from './TokensService';
@@ -299,13 +299,12 @@ export class CommandsService {
     const transactionResponse = await this.ocpiGraphqlClient.request<
       GetTransactionByTransactionIdQueryResult,
       GetTransactionByTransactionIdQueryVariables
-    >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-      // We note assume session id is now the database id
-      transactionId: stopSession.session_id,
+    >(GET_TRANSACTION_BY_ID_QUERY, {
+      id: Number(stopSession.session_id),
     });
     if (!transactionResponse.Transactions[0]) {
       this.logger.error('Unknown transaction', {
-        transactionId: stopSession.session_id,
+        transactionDBId: stopSession.session_id,
       });
       return ResponseGenerator.buildInvalidOrMissingParametersResponse(
         {
@@ -317,20 +316,7 @@ export class CommandsService {
     }
     const transaction = transactionResponse.Transactions[0];
 
-    if (!transaction.transactionId) {
-      this.logger.error('Transaction has no transactionId', {
-        transactionId: transaction.id,
-      });
-      return ResponseGenerator.buildInvalidOrMissingParametersResponse(
-        {
-          result: CommandResponseType.REJECTED,
-          timeout: this.config.commands.timeout,
-        },
-        'Session is invalid',
-      );
-    }
-    // Align stopSession session_id to the actual transactionId
-    stopSession.session_id = transaction.transactionId;
+    // session_id already contains the transaction.id, no need to remap
     if (
       tenantPartner.countryCode !==
         transaction.authorization!.tenantPartner!.countryCode! ||
@@ -348,7 +334,7 @@ export class CommandsService {
     }
     if (!transaction.isActive) {
       this.logger.error('Stop session transaction is not active', {
-        transactionId: transaction.id,
+        transactionDBId: transaction.id,
       });
       return ResponseGenerator.buildInvalidOrMissingParametersResponse(
         {
@@ -372,7 +358,12 @@ export class CommandsService {
       );
     }
     this.commandExecutor
-      .executeStopSession(stopSession, tenantPartner, chargingStation)
+      .executeStopSession(
+        stopSession,
+        tenantPartner,
+        chargingStation,
+        transaction,
+      )
       .catch((error) => {
         this.handleCommandExecutionError(
           'Failed to execute StopSession command',

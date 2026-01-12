@@ -58,7 +58,7 @@ export abstract class BaseTransactionMapper {
 
       const locationDto = LocationMapper.fromGraphql(location);
 
-      transactionIdToLocationMap.set(transaction.transactionId!, locationDto);
+      transactionIdToLocationMap.set(transaction.id!.toString(), locationDto);
     }
     return transactionIdToLocationMap;
   }
@@ -82,7 +82,7 @@ export abstract class BaseTransactionMapper {
       if (transaction.authorization) {
         const tokenDto = await TokensMapper.toDto(transaction.authorization);
         if (tokenDto) {
-          transactionIdToTokenMap.set(transaction.transactionId!, tokenDto);
+          transactionIdToTokenMap.set(transaction.id!.toString(), tokenDto);
         } else {
           this.logger.debug(`Unmapped token for transaction ${transaction.id}`);
         }
@@ -114,7 +114,7 @@ export abstract class BaseTransactionMapper {
       }
       const tariff = transaction.tariff;
       if (tariff) {
-        transactionIdToTariffMap.set(transaction.transactionId!, tariff);
+        transactionIdToTariffMap.set(transaction.id!.toString(), tariff);
       } else {
         this.logger.debug(`No tariff for ${transaction.id}`);
       }

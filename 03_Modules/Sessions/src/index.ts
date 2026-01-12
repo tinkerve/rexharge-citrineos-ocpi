@@ -9,7 +9,7 @@ import {
   CdrMapper,
   DtoEventObjectType,
   DtoEventType,
-  GET_TRANSACTION_BY_TRANSACTION_ID_QUERY,
+  GET_TRANSACTION_BY_ID_QUERY,
   GetTransactionByTransactionIdQueryResult,
   GetTransactionByTransactionIdQueryVariables,
   IDtoEvent,
@@ -68,8 +68,8 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       const transactionResponse = await this.ocpiGraphqlClient.request<
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
-      >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-        transactionId: meterValueDto.transactionId!,
+      >(GET_TRANSACTION_BY_ID_QUERY, {
+        id: Number(meterValueDto.transactionId!),
       });
 
       if (!transactionResponse.Transactions[0]) {
@@ -118,8 +118,8 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
     const fullTransactionResponse = await this.ocpiGraphqlClient.request<
       GetTransactionByTransactionIdQueryResult,
       GetTransactionByTransactionIdQueryVariables
-    >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-      transactionId: transactionDto.transactionId!,
+    >(GET_TRANSACTION_BY_ID_QUERY, {
+      id: transactionDto.id!,
     });
 
     if (fullTransactionResponse.Transactions[0]) {
@@ -159,13 +159,13 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       const fullTransactionDtoResponse = await this.ocpiGraphqlClient.request<
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
-      >(GET_TRANSACTION_BY_TRANSACTION_ID_QUERY, {
-        transactionId: transactionDto.transactionId!,
+      >(GET_TRANSACTION_BY_ID_QUERY, {
+        id: transactionDto.id!,
       });
 
       if (!fullTransactionDtoResponse.Transactions[0]) {
         this._logger.error(
-          `Full Transaction DTO not found for ID ${transactionDto.transactionId}, cannot broadcast.`,
+          `Full Transaction DTO not found for ID ${transactionDto.id}, cannot broadcast.`,
         );
         return;
       }

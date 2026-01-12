@@ -108,6 +108,7 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
     tenantPartner: ITenantPartnerDto,
     chargingStation: IChargingStationDto,
     commandId: string,
+    transaction: any,
   ): Promise<void> {
     const options: IRequestOptions = {
       additionalHeaders: this.config.commands.coreHeaders,
@@ -124,7 +125,7 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
 
     const requestStopTransactionRequest: OCPP2_0_1.RequestStopTransactionRequest =
       {
-        transactionId: stopSession.session_id,
+        transactionId: transaction.transactionId,
       };
     await this.sendOCPPMessage(
       this.config.commands.ocpp2_0_1.requestStopTransactionRequestUrl,

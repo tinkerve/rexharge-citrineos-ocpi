@@ -44,9 +44,9 @@ export class SessionMapper extends BaseTransactionMapper {
     const [locationMap, tokenMap, tariffMap] =
       await this.getLocationsTokensAndTariffsMapsForTransactions([transaction]);
 
-    const location = locationMap.get(transaction.transactionId!);
-    const token = tokenMap.get(transaction.transactionId!);
-    const tariff = tariffMap.get(transaction.transactionId!);
+    const location = locationMap.get(transaction.id!.toString());
+    const token = tokenMap.get(transaction.id!.toString());
+    const tariff = tariffMap.get(transaction.id!.toString());
 
     if (!location || !token || !tariff) {
       const missing = [];
@@ -55,7 +55,7 @@ export class SessionMapper extends BaseTransactionMapper {
       if (!tariff) missing.push('tariff');
 
       throw new Error(
-        `Cannot map transaction ${transaction.transactionId} to session. Missing: ${missing.join(', ')}`,
+        `Cannot map transaction ${transaction.id} to session. Missing: ${missing.join(', ')}`,
       );
     }
 
@@ -74,7 +74,7 @@ export class SessionMapper extends BaseTransactionMapper {
     transaction: Partial<ITransactionDto>,
   ): Promise<Partial<Session>> {
     // If we don't have a transaction ID, we can only map basic fields
-    if (!transaction.transactionId) {
+    if (!transaction.id) {
       return this.mapPartialTransactionWithoutContext(transaction);
     }
 
@@ -85,9 +85,9 @@ export class SessionMapper extends BaseTransactionMapper {
           transaction as ITransactionDto,
         ]);
 
-      const location = locationMap.get(transaction.transactionId);
-      const token = tokenMap.get(transaction.transactionId);
-      const tariff = tariffMap.get(transaction.transactionId);
+      const location = locationMap.get(transaction.id.toString());
+      const token = tokenMap.get(transaction.id.toString());
+      const tariff = tariffMap.get(transaction.id.toString());
 
       return this.mapPartialTransactionWithContext(
         transaction,
@@ -97,7 +97,7 @@ export class SessionMapper extends BaseTransactionMapper {
       );
     } catch (error) {
       this.logger.warn(
-        `Failed to fetch context for partial transaction ${transaction.transactionId}. Mapping without context.`,
+        `Failed to fetch context for partial transaction ${transaction.id}. Mapping without context.`,
         error,
       );
       return this.mapPartialTransactionWithoutContext(transaction);
@@ -142,10 +142,10 @@ export class SessionMapper extends BaseTransactionMapper {
     const result: Session[] = [];
     for (const transaction of transactions) {
       const location = transactionIdToLocationMap.get(
-        transaction.transactionId!,
+        transaction.id!.toString(),
       );
-      const token = transactionIdToTokenMap.get(transaction.transactionId!);
-      const tariff = transactionIdToTariffMap.get(transaction.transactionId!);
+      const token = transactionIdToTokenMap.get(transaction.id!.toString());
+      const tariff = transactionIdToTariffMap.get(transaction.id!.toString());
 
       if (location && token && tariff) {
         result.push(
@@ -157,7 +157,7 @@ export class SessionMapper extends BaseTransactionMapper {
           ),
         );
       } else {
-        this.logger.debug(`Skipped transaction ${transaction.transactionId}`);
+        this.logger.debug(`Skipped transaction ${transaction.id}`);
       }
     }
     return result;
@@ -175,8 +175,8 @@ export class SessionMapper extends BaseTransactionMapper {
     const session: Partial<Session> = {};
 
     // Map basic transaction fields
-    if (transaction.transactionId !== undefined) {
-      session.id = transaction.transactionId;
+    if (transaction.id !== undefined) {
+      session.id = transaction.id.toString();
     }
 
     if (transaction.startTime !== undefined) {
@@ -268,8 +268,8 @@ export class SessionMapper extends BaseTransactionMapper {
   ): Partial<Session> {
     const session: Partial<Session> = {};
 
-    if (transaction.transactionId !== undefined) {
-      session.id = transaction.transactionId;
+    if (transaction.id !== undefined) {
+      session.id = transaction.id.toString();
     }
 
     if (transaction.startTime !== undefined) {
@@ -323,12 +323,12 @@ export class SessionMapper extends BaseTransactionMapper {
     return {
       country_code: location.country_code,
       party_id: location.party_id,
-      id: transaction.transactionId!,
+      id: transaction.id!.toString(),
       start_date_time: transaction.startTime
         ? toISOStringIfNeeded(transaction.startTime, true)
         : (() => {
             this.logger.error(
-              `Transaction ${transaction.transactionId} has no startTime. Using createdAt as placeholder.`,
+              `Transaction ${transaction.id} has no startTime. Using createdAt as placeholder.`,
             );
             return toISOStringIfNeeded(transaction.createdAt!, true);
           })(),

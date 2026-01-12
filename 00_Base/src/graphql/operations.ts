@@ -610,7 +610,7 @@ export type ReadAuthorizationsQueryResult = {
     idTokenType?: string | null,
     additionalInfo?: any | null,
     status: string,
-    realTimeAuth: string,
+    realTimeAuth?: string | null,
     language1?: string | null,
     groupAuthorizationId?: number | null,
     tenantPartner?: {
@@ -643,7 +643,7 @@ export type UpdateAuthorizationMutationResult = {
       idTokenType?: string | null,
       additionalInfo?: any | null,
       status: string,
-      realTimeAuth: string,
+      realTimeAuth?: string | null,
       language1?: string | null,
       groupAuthorizationId?: number | null,
       tenantPartner?: {
@@ -674,7 +674,7 @@ export type GetAuthorizationByTokenQueryResult = {
     additionalInfo?: any | null,
     groupAuthorizationId?: number | null,
     status: string,
-    realTimeAuth: string,
+    realTimeAuth?: string | null,
     language1?: string | null,
     createdAt: any,
     updatedAt: any,
@@ -703,7 +703,7 @@ export type GetAuthorizationByIdQueryResult = {
     additionalInfo?: any | null,
     groupAuthorizationId?: number | null,
     status: string,
-    realTimeAuth: string,
+    realTimeAuth?: string | null,
     language1?: string | null,
     createdAt: any,
     updatedAt: any,
@@ -743,7 +743,7 @@ export type CreateAuthorizationMutationResult = {
     idTokenType?: string | null,
     additionalInfo?: any | null,
     status: string,
-    realTimeAuth: string,
+    realTimeAuth?: string | null,
     language1?: string | null,
     groupAuthorizationId?: number | null,
     tenantPartner?: {
@@ -826,7 +826,7 @@ export type GetTransactionsQueryResult = {
 };
 
 export type GetTransactionByTransactionIdQueryVariables = Exact<{
-  transactionId: Scalars['String']['input'];
+  id: Scalars['Int']['input'];
 }>;
 
 

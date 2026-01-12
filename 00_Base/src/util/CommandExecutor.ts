@@ -101,6 +101,7 @@ export class CommandExecutor {
     stopSession: StopSession,
     tenantPartner: ITenantPartnerDto,
     chargingStation: IChargingStationDto,
+    transaction: any,
   ): Promise<void> {
     this.logger.info('Executing StopSession command', { stopSession });
 
@@ -121,6 +122,7 @@ export class CommandExecutor {
         tenantPartner,
         chargingStation,
         commandId,
+        transaction,
       );
     } else {
       this.logger.warn('StopSession failed');

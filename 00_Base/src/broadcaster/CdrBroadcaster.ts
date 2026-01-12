@@ -29,7 +29,7 @@ export class CdrBroadcaster extends BaseBroadcaster {
     ]);
     if (cdrs.length === 0) {
       this.logger.warn(
-        `No CDRs generated for Transaction: ${transactionDto.transactionId}`,
+        `No CDRs generated for Transaction: ${transactionDto.id}`,
       );
       return;
     }

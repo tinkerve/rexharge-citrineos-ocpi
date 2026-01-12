@@ -66,6 +66,7 @@ export abstract class OCPPCommandHandler {
     tenantPartner: ITenantPartnerDto,
     chargingStation: IChargingStationDto,
     commandId: string,
+    transaction: any,
   ): Promise<void>;
 
   abstract sendUnlockConnectorCommand(
