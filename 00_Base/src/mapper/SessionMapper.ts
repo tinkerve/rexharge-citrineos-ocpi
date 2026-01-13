@@ -213,16 +213,11 @@ export class SessionMapper extends BaseTransactionMapper {
 
     if (tariff) {
       session.currency = tariff.currency;
-      if (
-        transaction.totalKwh !== undefined &&
-        transaction.endTime !== undefined
-      ) {
-        session.total_cost = transaction.endTime
-          ? this.calculateTotalCost(
-              transaction.totalKwh || 0,
-              tariff.pricePerKwh,
-            )
-          : null;
+      if (transaction.totalKwh !== undefined) {
+        session.total_cost = this.calculateTotalCost(
+          transaction.totalKwh || 0,
+          tariff.pricePerKwh,
+        );
       }
     }
 

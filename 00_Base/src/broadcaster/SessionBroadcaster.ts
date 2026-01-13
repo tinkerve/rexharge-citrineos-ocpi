@@ -58,7 +58,7 @@ export class SessionBroadcaster extends BaseBroadcaster {
       [meterValueDto],
       meterValueDto.tariffId!.toString(),
     );
-    const path = `/${tenant.countryCode}/${tenant.partyId}/${meterValueDto.transactionId}`;
+    const path = `/${tenant.countryCode}/${tenant.partyId}/${meterValueDto.transactionDatabaseId}`;
     await this.broadcastSession(
       tenant,
       { charging_periods },
