@@ -66,7 +66,8 @@ export function createLocalOcpiConfig(): OcpiConfigInput {
     commands: {
       timeout: parseInt(process.env.COMMANDS_TIMEOUT || '30'),
       ocpiBaseUrl:
-        process.env.COMMANDS_OCPI_BASE_URL || 'http://localhost:8085/ocpi',
+        process.env.COMMANDS_OCPI_BASE_URL ||
+        'http://host.docker.internal:8085/ocpi',
       coreHeaders: JSON.parse(process.env.COMMANDS_CORE_HEADERS || '{}'),
       ocpp1_6: {
         remoteStartTransactionRequestUrl:
