@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@citrineos/ocpi-base": "2.0.0",
-    "@citrineos/util": "~1.8.0",
+    "@citrineos/util": "1.8.0",
     "tslog": "4.9.2"
   }
 }

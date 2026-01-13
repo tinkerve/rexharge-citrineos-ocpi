@@ -19,8 +19,8 @@
     "typescript": "5.0.4"
   },
   "dependencies": {
-    "@citrineos/base": "~1.8.0",
-    "@citrineos/data": "~1.8.0",
+    "@citrineos/base": "1.8.0",
+    "@citrineos/data": "1.8.0",
     "@citrineos/ocpi-base": "2.0.0"
   },
   "workspaces": [
