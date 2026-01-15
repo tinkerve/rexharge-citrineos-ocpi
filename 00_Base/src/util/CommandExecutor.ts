@@ -40,6 +40,7 @@ import {
 import {
   COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
   COMMAND_RESPONSE_URL_CACHE_RESOLVED,
+  TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
 } from './Consts.js';
 
 @Service()
@@ -91,6 +92,16 @@ export class CommandExecutor {
         chargingStation,
         commandId,
       );
+
+      //Associate token.uid with the authorization_reference in cache for later use in transaction
+      if (startSession.token.uid && startSession.authorization_reference) {
+        await this.cache.set(
+          startSession.token.uid,
+          startSession.authorization_reference,
+          TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
+          60,
+        );
+      }
     } else {
       this.logger.warn('StartSession failed');
     }

@@ -800,6 +800,7 @@ export type GetTransactionsQueryResult = {
     authorizationId?: number | null,
     tariffId?: number | null,
     tenantId: number,
+    customData?: any | null,
     tenant: {
       countryCode: string,
       partyId: string
@@ -823,6 +824,20 @@ export type GetTransactionsQueryResult = {
       sampledValue?: any | null
     }>
   }>
+};
+
+export type UpdateTransactionCustomDataMutationVariables = Exact<{
+  id: Scalars['Int']['input'];
+  customData: Scalars['jsonb']['input'];
+}>;
+
+
+export type UpdateTransactionCustomDataMutationResult = {
+  update_Transactions_by_pk?: {
+    id: number,
+    customData?: any | null,
+    updatedAt: any
+  } | null
 };
 
 export type GetTransactionByTransactionIdQueryVariables = Exact<{
@@ -851,6 +866,7 @@ export type GetTransactionByTransactionIdQueryResult = {
     locationId?: number | null,
     authorizationId?: number | null,
     tariffId?: number | null,
+    customData?: any | null,
     tenant: {
       countryCode: string,
       partyId: string

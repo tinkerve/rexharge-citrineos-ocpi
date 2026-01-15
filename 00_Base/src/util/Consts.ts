@@ -13,6 +13,7 @@ export const MINUTES_IN_HOUR = 60;
 export const CREATE = 'create';
 export const UPDATE = 'update';
 export const COMMAND_RESPONSE_URL_CACHE_NAMESPACE = 'commands';
+export const TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE = 'tokenIdToAuthRef';
 /**
  * Used to replace response url in cache so that the timeout handler knows the command
  * was resolved instead of timed out and doesn't attempt to send a command result.

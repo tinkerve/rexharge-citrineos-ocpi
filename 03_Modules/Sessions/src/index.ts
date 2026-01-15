@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { ICache, IMeterValueDto, ITransactionDto } from '@citrineos/base';
 import {
   AbstractDtoModule,
   AsDtoEventHandler,
+  CacheWrapper,
   CdrBroadcaster,
-  CdrMapper,
   DtoEventObjectType,
   DtoEventType,
   GET_TRANSACTION_BY_ID_QUERY,
@@ -19,27 +20,32 @@ import {
   OcpiModule,
   RabbitMqDtoReceiver,
   SessionBroadcaster,
-  SessionMapper,
+  UPDATE_TRANSACTION_CUSTOM_DATA_MUTATION,
+  UpdateTransactionCustomDataMutationResult,
+  UpdateTransactionCustomDataMutationVariables,
+  TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
 } from '@citrineos/ocpi-base';
 import { ILogObj, Logger } from 'tslog';
 import { Inject, Service } from 'typedi';
 import { SessionsModuleApi } from './module/SessionsModuleApi';
-import { IMeterValueDto, ITransactionDto } from '@citrineos/base';
-import { Cdr } from '@citrineos/ocpi-base/src/model/Cdr';
 
-export { SessionsModuleApi } from './module/SessionsModuleApi';
 export { ISessionsModuleApi } from './module/ISessionsModuleApi';
+export { SessionsModuleApi } from './module/SessionsModuleApi';
 
 @Service()
 export class SessionsModule extends AbstractDtoModule implements OcpiModule {
+  private cache: ICache;
+
   constructor(
     @Inject(OcpiConfigToken) config: OcpiConfig,
     logger: Logger<ILogObj>,
     readonly ocpiGraphqlClient: OcpiGraphqlClient,
     readonly sessionBroadcaster: SessionBroadcaster,
     readonly cdrBroadcaster: CdrBroadcaster,
+    @Inject() cacheWrapper: CacheWrapper,
   ) {
     super(config, new RabbitMqDtoReceiver(config, logger), logger);
+    this.cache = cacheWrapper.cache;
   }
 
   getController(): any {
@@ -122,17 +128,60 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       id: transactionDto.id!,
     });
 
-    if (fullTransactionResponse.Transactions[0]) {
-      const fullTransactionDto = fullTransactionResponse
-        .Transactions[0] as ITransactionDto;
-      await this.sessionBroadcaster.broadcastPutSession(
-        tenant,
-        fullTransactionDto,
-      );
-    } else {
-      // Fallback to original transaction if full fetch fails
-      await this.sessionBroadcaster.broadcastPutSession(tenant, transactionDto);
+    const fullTransactionDto = fullTransactionResponse.Transactions[0]
+      ? (fullTransactionResponse.Transactions[0] as ITransactionDto)
+      : transactionDto;
+
+    // Associate token ID with authorization_reference if available in cache
+    if (fullTransactionDto.authorization?.idToken) {
+      try {
+        const authorizationReference: string | null = await this.cache.get(
+          fullTransactionDto.authorization.idToken,
+          TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
+        );
+        this.cache.remove(
+          fullTransactionDto.authorization.idToken,
+          TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
+        );
+
+        if (authorizationReference) {
+          this._logger.debug(
+            `Found authorization_reference ${authorizationReference} for token ${fullTransactionDto.authorization.idToken}`,
+          );
+          // Store authorization_reference in customData in database
+          const customData = fullTransactionDto.customData || {};
+          customData.authorization_reference = authorizationReference;
+
+          await this.ocpiGraphqlClient.request<
+            UpdateTransactionCustomDataMutationResult,
+            UpdateTransactionCustomDataMutationVariables
+          >(UPDATE_TRANSACTION_CUSTOM_DATA_MUTATION, {
+            id: fullTransactionDto.id!,
+            customData,
+          });
+
+          // Update the DTO for broadcasting
+          fullTransactionDto.customData = customData;
+
+          this._logger.debug(
+            `Successfully updated transaction ${fullTransactionDto.id} with authorization_reference in database`,
+          );
+        } else {
+          this._logger.warn(
+            `No authorization_reference found in cache for token ${fullTransactionDto.authorization.idToken}`,
+          );
+        }
+      } catch (error) {
+        this._logger.error(
+          `Error retrieving or updating authorization_reference: ${error}`,
+        );
+      }
     }
+
+    await this.sessionBroadcaster.broadcastPutSession(
+      tenant,
+      fullTransactionDto,
+    );
   }
 
   @AsDtoEventHandler(

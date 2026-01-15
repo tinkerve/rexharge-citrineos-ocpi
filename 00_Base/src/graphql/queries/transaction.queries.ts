@@ -36,6 +36,7 @@ export const GET_TRANSACTIONS_QUERY = gql`
       authorizationId
       tariffId
       tenantId
+      customData
       tenant: Tenant {
         countryCode
         partyId
@@ -58,6 +59,19 @@ export const GET_TRANSACTIONS_QUERY = gql`
         timestamp
         sampledValue
       }
+    }
+  }
+`;
+
+export const UPDATE_TRANSACTION_CUSTOM_DATA_MUTATION = gql`
+  mutation UpdateTransactionCustomData($id: Int!, $customData: jsonb!) {
+    update_Transactions_by_pk(
+      pk_columns: { id: $id }
+      _set: { customData: $customData }
+    ) {
+      id
+      customData
+      updatedAt
     }
   }
 `;
@@ -88,6 +102,7 @@ export const GET_TRANSACTION_BY_ID_QUERY = gql`
       locationId
       authorizationId
       tariffId
+      customData
       authorization: Authorization {
         tenantPartner: TenantPartner {
           id

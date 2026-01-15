@@ -253,6 +253,7 @@ export {
   NOT_APPLICABLE,
   CREATE,
   UPDATE,
+  TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
 } from './util/Consts';
 
 export { ResponseSchema } from './openapi-spec-helper/decorators';
