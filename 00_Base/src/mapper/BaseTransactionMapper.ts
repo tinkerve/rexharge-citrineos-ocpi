@@ -69,7 +69,8 @@ export abstract class BaseTransactionMapper {
     const transactionIdToTokenMap: Map<string, TokenDTO> = new Map();
 
     for (const transaction of transactions) {
-      if (!transaction.authorization && transaction.authorizationId) {
+      // if (!transaction.authorization && transaction.authorizationId) {
+      if (transaction.authorizationId) {
         const result = await this.ocpiGraphqlClient.request<
           GetAuthorizationByIdQueryResult,
           GetAuthorizationByIdQueryVariables
@@ -80,7 +81,7 @@ export abstract class BaseTransactionMapper {
         }
       }
       if (transaction.authorization) {
-        const tokenDto = await TokensMapper.toDto(transaction.authorization);
+        const tokenDto = TokensMapper.toDto(transaction.authorization);
         if (tokenDto) {
           transactionIdToTokenMap.set(transaction.id!.toString(), tokenDto);
         } else {
