@@ -14,6 +14,7 @@ import type { StopSession } from '../../model/StopSession.js';
 import type { UnlockConnector } from '../../index.js';
 import { CommandResultType } from '../../index.js';
 import { ILogObj, Logger } from 'tslog';
+import { TokensMapper } from '../../mapper/TokensMapper.js';
 
 @Service({ id: OCPP_COMMAND_HANDLER, multiple: true })
 export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
@@ -43,7 +44,7 @@ export class OCPP1_6_CommandHandler extends OCPPCommandHandler {
     const remoteStartTransactionRequest: OCPP1_6.RemoteStartTransactionRequest =
       {
         connectorId: Number(startSession.connector_id),
-        idTag: startSession.token.uid,
+        idTag: TokensMapper.normalizeToken(startSession.token.uid)!,
       };
 
     await this.sendOCPPMessage(

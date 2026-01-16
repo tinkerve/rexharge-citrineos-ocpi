@@ -53,6 +53,7 @@ export type Authorizations_Set_Input = {
   language1?: InputMaybe<Scalars['String']['input']>;
   groupAuthorizationId?: InputMaybe<Scalars['Int']['input']>;
   realTimeAuth?: InputMaybe<Scalars['String']['input']>;
+  customData?: InputMaybe<Scalars['jsonb']['input']>;
   updatedAt: Scalars['timestamptz']['input'];
 };
 export type Locations_Bool_Exp = {

@@ -20,6 +20,7 @@ import {
   CommandResultType,
   CommandType,
   OcpiConfigToken,
+  TokensMapper,
 } from '../index.js';
 import type { ILogObj } from 'tslog';
 import { Logger } from 'tslog';
@@ -96,7 +97,7 @@ export class CommandExecutor {
       //Associate token.uid with the authorization_reference in cache for later use in transaction
       if (startSession.token.uid && startSession.authorization_reference) {
         await this.cache.set(
-          startSession.token.uid,
+          TokensMapper.normalizeToken(startSession.token.uid) || '',
           startSession.authorization_reference,
           TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
           60,

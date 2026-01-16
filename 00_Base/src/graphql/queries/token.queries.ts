@@ -36,6 +36,7 @@ export const READ_AUTHORIZATION = gql`
       idToken
       idTokenType
       additionalInfo
+      customData
       status
       realTimeAuth
       language1
@@ -75,6 +76,7 @@ export const UPDATE_TOKEN_MUTATION = gql`
         idToken
         idTokenType
         additionalInfo
+        customData
         status
         realTimeAuth
         language1
@@ -110,6 +112,7 @@ export const GET_AUTHORIZATION_BY_TOKEN = gql`
         idToken
       }
       additionalInfo
+      customData
       groupAuthorizationId
       status
       realTimeAuth
@@ -136,6 +139,7 @@ export const GET_AUTHORIZATION_BY_ID = gql`
         idToken
       }
       additionalInfo
+      customData
       groupAuthorizationId
       status
       realTimeAuth
@@ -153,6 +157,7 @@ export const CREATE_AUTHORIZATION_MUTATION = gql`
     $idToken: String!
     $idTokenType: String!
     $additionalInfo: jsonb
+    $customData: jsonb
     $status: String!
     $language1: String
     $groupAuthorizationId: Int
@@ -167,6 +172,7 @@ export const CREATE_AUTHORIZATION_MUTATION = gql`
         idToken: $idToken
         idTokenType: $idTokenType
         additionalInfo: $additionalInfo
+        customData: $customData
         status: $status
         language1: $language1
         groupAuthorizationId: $groupAuthorizationId
@@ -190,6 +196,7 @@ export const CREATE_AUTHORIZATION_MUTATION = gql`
       idToken
       idTokenType
       additionalInfo
+      customData
       status
       realTimeAuth
       language1

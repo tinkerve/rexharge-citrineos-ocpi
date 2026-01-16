@@ -7,6 +7,7 @@ import { OcpiLogger } from '../util/OcpiLogger';
 import { SingleTokenRequest, TokenDTO } from '../model/DTO/TokenDTO';
 import { TokenType } from '../model/TokenType';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
+import { createHash } from 'crypto';
 import {
   UPDATE_TOKEN_MUTATION,
   READ_AUTHORIZATION,
@@ -64,8 +65,11 @@ export class TokensService {
   async getToken(
     tokenRequest: SingleTokenRequest,
   ): Promise<TokenDTO | undefined> {
+    // Normalize the token UID before querying since we store normalized tokens
+    const normalizedTokenUid = TokensMapper.normalizeToken(tokenRequest.uid);
+
     const variables = {
-      idToken: tokenRequest.uid,
+      idToken: normalizedTokenUid,
       type: TokensMapper.mapOcpiTokenTypeToOcppIdTokenType(
         tokenRequest?.type ?? TokenType.RFID,
       ),
@@ -125,6 +129,7 @@ export class TokensService {
         tenantPartnerId,
         set: {
           additionalInfo: authorization.additionalInfo,
+          customData: (authorization as any).customData,
           status: authorization.status!,
           language1: authorization.language1,
           groupAuthorizationId,
@@ -134,7 +139,7 @@ export class TokensService {
       });
 
       return TokensMapper.toDto(
-        result.update_Authorizations?.returning[0] as IAuthorizationDto,
+        result.update_Authorizations?.returning[0] as any,
       );
     } else {
       const timestamp = token.last_updated;
@@ -147,6 +152,7 @@ export class TokensService {
         idToken: authorization.idToken!,
         idTokenType: authorization.idTokenType!,
         additionalInfo: authorization.additionalInfo,
+        customData: (authorization as any).customData,
         status: authorization.status!,
         language1: authorization.language1,
         groupAuthorizationId,
@@ -155,9 +161,7 @@ export class TokensService {
         updatedAt: timestamp,
       });
 
-      return TokensMapper.toDto(
-        result.insert_Authorizations_one as IAuthorizationDto,
-      );
+      return TokensMapper.toDto(result.insert_Authorizations_one as any);
     }
   }
 
@@ -172,6 +176,10 @@ export class TokensService {
       throw new MissingParamException(
         `Tokens PATCH must contain last_updated.`,
       );
+
+    // Normalize the token UID before querying since we store normalized tokens
+    const normalizedTokenUid = TokensMapper.normalizeToken(tokenUid);
+
     const idTokenType = TokensMapper.mapOcpiTokenTypeToOcppIdTokenType(type);
     const authorization =
       TokensMapper.mapOcpiTokenToPartialOcppAuthorization(token);
@@ -180,7 +188,7 @@ export class TokensService {
       GetAuthorizationByTokenQueryResult,
       GetAuthorizationByTokenQueryVariables
     >(GET_AUTHORIZATION_BY_TOKEN, {
-      idToken: tokenUid,
+      idToken: normalizedTokenUid ?? '',
       idTokenType,
       tenantPartnerId,
     });
@@ -201,6 +209,9 @@ export class TokensService {
         set.additionalInfo = authorization.additionalInfo;
       }
     }
+    if ((authorization as any).customData !== undefined) {
+      set.customData = (authorization as any).customData;
+    }
     if (authorization.status) set.status = authorization.status;
     if (authorization.language1) set.language1 = authorization.language1;
     if (token.group_id) {
@@ -214,7 +225,7 @@ export class TokensService {
       set.realTimeAuth = authorization.realTimeAuth;
 
     const updateVariables = {
-      idToken: tokenUid,
+      idToken: normalizedTokenUid ?? '',
       type: idTokenType,
       tenantPartnerId,
       set,
@@ -224,7 +235,7 @@ export class TokensService {
       UpdateAuthorizationMutationVariables
     >(UPDATE_TOKEN_MUTATION, updateVariables);
     return TokensMapper.toDto(
-      result.update_Authorizations?.returning[0] as IAuthorizationDto,
+      result.update_Authorizations?.returning[0] as any,
     );
   }
 

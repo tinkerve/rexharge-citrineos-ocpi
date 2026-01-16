@@ -28,6 +28,7 @@ export type Authorizations_Set_Input = {
   language1?: InputMaybe<Scalars['String']['input']>;
   groupAuthorizationId?: InputMaybe<Scalars['Int']['input']>;
   realTimeAuth?: InputMaybe<Scalars['String']['input']>;
+  customData?: InputMaybe<Scalars['jsonb']['input']>;
   updatedAt: Scalars['timestamptz']['input'];
 };
 export type Locations_Bool_Exp = {
@@ -609,6 +610,7 @@ export type ReadAuthorizationsQueryResult = {
     idToken: string,
     idTokenType?: string | null,
     additionalInfo?: any | null,
+    customData?: any | null,
     status: string,
     realTimeAuth?: string | null,
     language1?: string | null,
@@ -642,6 +644,7 @@ export type UpdateAuthorizationMutationResult = {
       idToken: string,
       idTokenType?: string | null,
       additionalInfo?: any | null,
+      customData?: any | null,
       status: string,
       realTimeAuth?: string | null,
       language1?: string | null,
@@ -672,6 +675,7 @@ export type GetAuthorizationByTokenQueryResult = {
     idTokenType?: string | null,
     tenantId: number,
     additionalInfo?: any | null,
+    customData?: any | null,
     groupAuthorizationId?: number | null,
     status: string,
     realTimeAuth?: string | null,
@@ -701,6 +705,7 @@ export type GetAuthorizationByIdQueryResult = {
     idTokenType?: string | null,
     tenantId: number,
     additionalInfo?: any | null,
+    customData?: any | null,
     groupAuthorizationId?: number | null,
     status: string,
     realTimeAuth?: string | null,
@@ -724,6 +729,7 @@ export type CreateAuthorizationMutationVariables = Exact<{
   idToken: Scalars['String']['input'];
   idTokenType: Scalars['String']['input'];
   additionalInfo?: InputMaybe<Scalars['jsonb']['input']>;
+  customData?: InputMaybe<Scalars['jsonb']['input']>;
   status: Scalars['String']['input'];
   language1?: InputMaybe<Scalars['String']['input']>;
   groupAuthorizationId?: InputMaybe<Scalars['Int']['input']>;
@@ -742,6 +748,7 @@ export type CreateAuthorizationMutationResult = {
     idToken: string,
     idTokenType?: string | null,
     additionalInfo?: any | null,
+    customData?: any | null,
     status: string,
     realTimeAuth?: string | null,
     language1?: string | null,

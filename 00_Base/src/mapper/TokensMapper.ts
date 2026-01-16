@@ -14,13 +14,20 @@ import { TokenType } from '../model/TokenType';
 import { TokenDTO } from '../model/DTO/TokenDTO';
 import { WhitelistType } from '../model/WhitelistType';
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
+import { createHash } from 'crypto';
 
 export class TokensMapper {
   public static toDto(authorization: IAuthorizationDto): TokenDTO {
+    // Retrieve original token UID from customData if it exists, otherwise use normalized idToken
+    // Note: customData exists in DB but not in TypeScript interface, so we use type assertion
+    const originalTokenUid =
+      (authorization as any).customData?.original_token_uid ||
+      authorization.idToken;
+
     const tokenDto: TokenDTO = {
       country_code: authorization.tenantPartner!.countryCode!,
       party_id: authorization.tenantPartner!.partyId!,
-      uid: authorization.idToken,
+      uid: originalTokenUid,
       type: TokensMapper.mapOcppIdTokenTypeToOcpiTokenType(
         authorization.idTokenType ? authorization.idTokenType : null,
       ),
@@ -110,7 +117,10 @@ export class TokensMapper {
   public static mapOcpiTokenToPartialOcppAuthorization(
     tokenDto: Partial<TokenDTO>,
   ): Partial<IAuthorizationDto> {
-    const idToken: string | undefined = tokenDto.uid;
+    const originalTokenUid = tokenDto.uid;
+    const idToken: string | undefined = TokensMapper.normalizeToken(
+      tokenDto.uid,
+    );
     const idTokenType: IdTokenType | undefined =
       tokenDto.type &&
       TokensMapper.mapOcpiTokenTypeToOcppIdTokenType(tokenDto.type);
@@ -163,7 +173,15 @@ export class TokensMapper {
     const realTimeAuth: AuthorizationWhitelistType | null | undefined =
       TokensMapper.mapWhitelistType(tokenDto.whitelist);
 
-    return {
+    // Store original token UID in customData if it was normalized
+    const customData =
+      originalTokenUid && originalTokenUid !== idToken
+        ? { original_token_uid: originalTokenUid }
+        : undefined;
+
+    // Note: customData exists in DB but not in IAuthorizationDto TypeScript interface
+    // Return with type assertion to include customData
+    const result: Partial<IAuthorizationDto> = {
       additionalInfo,
       idToken,
       idTokenType,
@@ -171,6 +189,12 @@ export class TokensMapper {
       language1,
       realTimeAuth,
     };
+
+    if (customData) {
+      (result as any).customData = customData;
+    }
+
+    return result;
   }
 
   public static getContractId(authorization: IAuthorizationDto): string {
@@ -255,5 +279,22 @@ export class TokensMapper {
   public static toGraphqlSet(token: Partial<TokenDTO>): any {
     const set: any = TokensMapper.mapOcpiTokenToPartialOcppAuthorization(token);
     return set;
+  }
+
+  public static normalizeToken(
+    tokenUid: string | undefined,
+  ): string | undefined {
+    if (!tokenUid) {
+      return undefined;
+    }
+
+    if (tokenUid.length <= 20) {
+      return tokenUid;
+    }
+
+    // Create a deterministic hash of the token UID
+    // Take first 20 chars of hex hash (40 hex chars from SHA-256, we take half)
+    const hash = createHash('sha256').update(tokenUid).digest('hex');
+    return hash.substring(0, 20);
   }
 }

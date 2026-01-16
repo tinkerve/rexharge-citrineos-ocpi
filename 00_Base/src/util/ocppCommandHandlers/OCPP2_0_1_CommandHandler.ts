@@ -84,7 +84,7 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
       {
         remoteStartId,
         idToken: {
-          idToken: startSession.token.uid,
+          idToken: TokensMapper.normalizeToken(startSession.token.uid)!,
           type: OCPP2_0_1_Mapper.AuthorizationMapper.toIdTokenEnumType(
             TokensMapper.mapOcpiTokenTypeToOcppIdTokenType(
               startSession.token.type,

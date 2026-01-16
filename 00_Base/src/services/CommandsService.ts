@@ -59,24 +59,15 @@ export class CommandsService {
     this.logger.error(message, formattedError);
   }
 
-  private async validateToken(
+  private async validateTokenAndNormalizeToken(
     token: TokenDTO,
     tenantPartner: ITenantPartnerDto,
-  ): Promise<void> {
+  ): Promise<TokenDTO> {
     if (!tenantPartner.tenant?.id || !tenantPartner.id) {
       throw new Error('Missing tenant identifiers to whitelist token');
     }
 
-    const existingToken = await this.tokensService.getToken({
-      uid: token.uid,
-      type: token.type,
-      country_code: token.country_code,
-      party_id: token.party_id,
-    });
-
-    if (existingToken) return;
-
-    await this.tokensService.upsertToken(
+    return await this.tokensService.upsertToken(
       token,
       tenantPartner.tenant.id,
       tenantPartner.id,
@@ -151,7 +142,10 @@ export class CommandsService {
     }
 
     try {
-      await this.validateToken(reserveNow.token, tenantPartner);
+      reserveNow.token = await this.validateTokenAndNormalizeToken(
+        reserveNow.token,
+        tenantPartner,
+      );
     } catch (error) {
       this.handleCommandExecutionError(
         'Failed to save token before ReserveNow',
@@ -201,7 +195,10 @@ export class CommandsService {
     }
 
     try {
-      await this.validateToken(startSession.token, tenantPartner);
+      startSession.token = await this.validateTokenAndNormalizeToken(
+        startSession.token,
+        tenantPartner,
+      );
     } catch (error) {
       this.handleCommandExecutionError(
         'Failed to save token before StartSession',
