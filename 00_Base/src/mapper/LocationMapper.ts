@@ -290,7 +290,6 @@ export class EvseMapper {
 
     const anyInUse = connectors.some(
       (c) =>
-        c.status === ConnectorStatus.Preparing ||
         c.status === ConnectorStatus.Charging ||
         c.status === ConnectorStatus.SuspendedEVSE ||
         c.status === ConnectorStatus.SuspendedEV ||
@@ -306,7 +305,9 @@ export class EvseMapper {
       return EvseStatus.RESERVED;
     }
     const anyAvailable = connectors.some(
-      (c) => c.status === ConnectorStatus.Available,
+      (c) =>
+        c.status === ConnectorStatus.Available ||
+        c.status === ConnectorStatus.Preparing,
     );
     if (anyAvailable) {
       return EvseStatus.AVAILABLE;

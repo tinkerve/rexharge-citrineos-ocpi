@@ -38,18 +38,22 @@ export class TariffMapper {
   ): TariffElement {
     return {
       price_components: [
-        {
-          type: TariffDimensionType.ENERGY,
-          price: coreTariff.pricePerKwh!,
-          vat: coreTariff.taxRate,
-          step_size: 1,
-        },
+        ...(coreTariff.pricePerKwh
+          ? [
+              {
+                type: TariffDimensionType.ENERGY,
+                price: coreTariff.pricePerKwh,
+                vat: coreTariff.taxRate ?? 0,
+                step_size: 1,
+              },
+            ]
+          : []),
         ...(coreTariff.pricePerMin
           ? [
               {
                 type: TariffDimensionType.TIME,
                 price: coreTariff.pricePerMin * MINUTES_IN_HOUR,
-                vat: coreTariff.taxRate,
+                vat: coreTariff.taxRate ?? 0,
                 step_size: 1,
               },
             ]
@@ -59,7 +63,7 @@ export class TariffMapper {
               {
                 type: TariffDimensionType.FLAT,
                 price: coreTariff.pricePerSession,
-                vat: coreTariff.taxRate,
+                vat: coreTariff.taxRate ?? 0,
                 step_size: 1,
               },
             ]
