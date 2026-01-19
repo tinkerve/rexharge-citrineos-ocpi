@@ -160,10 +160,10 @@ export abstract class BaseClientApi {
     }
     const additionalHeaders = this.getHeaders(partnerProfile, overrideToken);
     if (routingHeaders) {
-      additionalHeaders[OcpiHttpHeader.OcpiFromCountryCode] = fromCountryCode;
-      additionalHeaders[OcpiHttpHeader.OcpiFromPartyId] = fromPartyId;
-      additionalHeaders[OcpiHttpHeader.OcpiToCountryCode] = toCountryCode;
-      additionalHeaders[OcpiHttpHeader.OcpiToPartyId] = toPartyId;
+      // additionalHeaders[OcpiHttpHeader.OcpiFromCountryCode] = fromCountryCode;
+      // additionalHeaders[OcpiHttpHeader.OcpiFromPartyId] = fromPartyId;
+      // additionalHeaders[OcpiHttpHeader.OcpiToCountryCode] = toCountryCode;
+      // additionalHeaders[OcpiHttpHeader.OcpiToPartyId] = toPartyId;
     }
     const options: IRequestOptions = { additionalHeaders };
     const queryParameters: IRequestQueryParams = {
