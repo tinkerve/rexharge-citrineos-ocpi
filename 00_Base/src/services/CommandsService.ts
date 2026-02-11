@@ -31,6 +31,9 @@ import { TokensService } from './TokensService';
 import { CommandExecutor } from '../util/CommandExecutor';
 import { OcpiLogger } from '../util/OcpiLogger';
 import { ResponseGenerator } from '../util/response.generator';
+import { WhitelistType } from '../model/WhitelistType';
+import { AuthorizationInfoAllowed } from '../model/AuthorizationInfoAllowed';
+import { LocationReferences } from '../model/LocationReferences';
 
 @Service()
 export class CommandsService {
@@ -275,6 +278,48 @@ export class CommandsService {
         startSession.connector_id = matchingConnector.connectorId.toString();
       }
     }
+    if (startSession.token.whitelist === WhitelistType.NEVER) {
+      try {
+        const locationReferences: LocationReferences = {
+          location_id: startSession.location_id,
+          evse_uids: [startSession.evse_uid!],
+        };
+
+        const allowed = await this.tokensService.authorizeTokenWithEmsp(
+          startSession.token.uid,
+          startSession.token.type,
+          tenantPartner,
+          locationReferences,
+        );
+
+        if (allowed !== AuthorizationInfoAllowed.Allowed) {
+          this.logger.error(
+            'Real-time authorization rejected by eMSP',
+            { allowed, tokenUid: startSession.token.uid },
+          );
+          return ResponseGenerator.buildGenericClientErrorResponse(
+            {
+              result: CommandResponseType.REJECTED,
+              timeout: this.config.commands.timeout, 
+            },
+            `Token not authorized by eMSP: ${allowed}`,
+          );
+        }
+      } catch (error) {
+        this.handleCommandExecutionError(
+          'Failed to perform real-time authorization with eMSP',
+          error,
+        );
+        return ResponseGenerator.buildGenericClientErrorResponse(
+          {
+            result: CommandResponseType.REJECTED,
+            timeout: this.config.commands.timeout,
+          },
+          'Real-time authorization failed',
+        );
+      }
+    }
+
     this.commandExecutor
       .executeStartSession(startSession, tenantPartner, chargingStation)
       .catch((error) => {

@@ -21,9 +21,15 @@ export const TokenDTOSchema = z.object({
   group_id: z.string().max(36).nullable().optional(),
   valid: z.boolean(),
   whitelist: z.nativeEnum(WhitelistType),
-  language: z.string().length(2).nullable().optional(),
+  language: z.preprocess(
+    (val) => (val === '' ? null : val),
+    z.string().length(2).nullable().optional(),
+  ),
   default_profile_type: z.string().nullable().optional(),
-  energy_contract: TokenEnergyContractSchema.nullable().optional(),
+  energy_contract: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    TokenEnergyContractSchema.nullable().optional(),
+  ),
   last_updated: OcpiDateTimeSchema,
 });
 export const TokenDTOSchemaName = 'TokenDTOSchema';

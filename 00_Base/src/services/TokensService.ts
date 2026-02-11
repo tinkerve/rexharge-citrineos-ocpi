@@ -20,6 +20,7 @@ import {
   AuthorizationStatusType,
   IAuthorizationDto,
   IChargingStationDto,
+  ITenantPartnerDto,
   IdTokenType,
 } from '@citrineos/base';
 import {
@@ -53,6 +54,7 @@ import { GET_CHARGING_STATION_BY_ID_QUERY } from '../graphql/queries/chargingSta
 import { LocationReferences } from '../model/LocationReferences';
 import { UID_FORMAT } from '../model/DTO/EvseDTO';
 import { OcpiResponseStatusCode } from '../model/OcpiResponse';
+import { AuthorizationInfoAllowed } from '../model/AuthorizationInfoAllowed';
 
 @Service()
 export class TokensService {
@@ -313,6 +315,43 @@ export class TokensService {
         reason: postTokenResult.data!.info?.text,
       },
     };
+  }
+
+  async authorizeTokenWithEmsp(
+    tokenUid: string,
+    tokenType: TokenType,
+    tenantPartner: ITenantPartnerDto,
+    locationReferences?: LocationReferences,
+  ): Promise<AuthorizationInfoAllowed> {
+    this.logger.info('Performing real-time authorization with eMSP', {
+      tokenUid,
+      tokenType,
+    });
+
+    const postTokenResult = await this.tokensClientApi.postToken(
+      tenantPartner.tenant!.countryCode!,
+      tenantPartner.tenant!.partyId!,
+      tenantPartner.countryCode!,
+      tenantPartner.partyId!,
+      tenantPartner.partnerProfileOCPI!,
+      tokenUid,
+      tokenType,
+      locationReferences,
+    );
+
+    this.logger.debug('Real-time auth eMSP response', {
+      allowed: postTokenResult.data?.allowed,
+    });
+
+    if (
+      postTokenResult.status_code !== OcpiResponseStatusCode.GenericSuccessCode
+    ) {
+      throw new InvalidParamException(
+        `Failed to authorize token ${tokenUid} with eMSP`,
+      );
+    }
+
+    return postTokenResult.data!.allowed;
   }
 
   private async handleGroupAuthorization(
