@@ -436,50 +436,40 @@ export class SessionMapper extends BaseTransactionMapper {
   ): CdrDimension[] {
     const cdrDimensions: CdrDimension[] = [];
     for (const sampledValue of meterValue.sampledValue) {
-      switch (sampledValue.measurand) {
-        case OCPP2_0_1.MeasurandEnumType.Current_Import:
-          if (sampledValue.phase === 'N') {
-            cdrDimensions.push({
-              type: CdrDimensionType.CURRENT,
-              volume: Number(sampledValue.value),
-            });
-          }
-          break;
-        // TODO: dimension is here
-        case OCPP2_0_1.MeasurandEnumType.Energy_Active_Import_Register:
-          if (!sampledValue.phase) {
-            cdrDimensions.push({
-              type: CdrDimensionType.ENERGY_IMPORT,
-              volume: Number(sampledValue.value),
-            });
-            const previousEnergyImport =
-              this.getEnergyImportForMeterValue(previousMeterValue);
-            if (
-              previousEnergyImport !== undefined &&
-              !isNaN(Number(previousEnergyImport)) &&
-              !isNaN(Number(sampledValue.value))
-            ) {
-              cdrDimensions.push({
-                type: CdrDimensionType.ENERGY,
-                volume:
-                  Number(sampledValue.value) - Number(previousEnergyImport),
-              });
-            }
-          }
-          break;
-        case OCPP2_0_1.MeasurandEnumType.SoC:
+      if (
+        sampledValue.measurand ===
+          OCPP2_0_1.MeasurandEnumType.Energy_Active_Import_Register &&
+        !sampledValue.phase
+      ) {
+        const previousEnergyImport =
+          this.getEnergyImportForMeterValue(previousMeterValue);
+        if (
+          previousEnergyImport !== undefined &&
+          !isNaN(Number(previousEnergyImport)) &&
+          !isNaN(Number(sampledValue.value))
+        ) {
+          const energyDelta =
+            Number(sampledValue.value) - Number(previousEnergyImport);
           cdrDimensions.push({
-            type: CdrDimensionType.STATE_OF_CHARGE,
-            volume: Number(sampledValue.value),
+            type: CdrDimensionType.ENERGY,
+            volume: this.convertToKwh(energyDelta, (sampledValue as any).unit ?? (sampledValue as any).unitOfMeasure?.unit),
           });
-          break;
+        }
       }
     }
-    cdrDimensions.push({
-      type: CdrDimensionType.TIME,
-      volume: this.getTimeElapsedForMeterValue(meterValue, previousMeterValue),
-    });
     return cdrDimensions;
+  }
+
+  private convertToKwh(value: number, unit?: string | null): number {
+    switch (unit) {
+      case 'Wh':
+        return value / 1000;
+      case 'kWh':
+        return value;
+      default:
+        this.logger.warn(`Unknown energy unit "${unit}", assuming Wh`);
+        return value / 1000;
+    }
   }
 
   private getEnergyImportForMeterValue(meterValue?: IMeterValueDto) {
@@ -493,18 +483,6 @@ export class SessionMapper extends BaseTransactionMapper {
     );
   }
 
-  private getTimeElapsedForMeterValue(
-    meterValue: IMeterValueDto,
-    previousMeterValue?: IMeterValueDto,
-  ): number {
-    const timeDiffMs = previousMeterValue
-      ? new Date(meterValue.timestamp).getTime() -
-        new Date(previousMeterValue.timestamp).getTime()
-      : 0;
-
-    // Convert milliseconds to hours
-    return timeDiffMs / (1000 * 60 * 60); // 1000 ms/sec * 60 sec/min * 60 min/hour
-  }
 
   private getTransactionStatus(transaction: ITransactionDto): SessionStatus {
     // TODO: Implement other session status
