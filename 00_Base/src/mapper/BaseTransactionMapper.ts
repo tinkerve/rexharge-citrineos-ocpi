@@ -24,8 +24,11 @@ import {
   GetLocationByIdQueryVariables,
   GetTariffByKeyQueryResult,
   GetTariffByKeyQueryVariables,
+  GetTransactionByTransactionIdQueryResult,
+  GetTransactionByTransactionIdQueryVariables,
 } from '../graphql/operations';
 import { GET_TARIFF_BY_KEY_QUERY } from '../graphql/queries/tariff.queries';
+import { GET_TRANSACTION_BY_ID_QUERY } from '../graphql/queries/transaction.queries';
 import { TariffMapper } from './TariffMapper';
 import { GET_AUTHORIZATION_BY_ID } from '../graphql';
 
@@ -100,6 +103,16 @@ export abstract class BaseTransactionMapper {
   ): Promise<Map<string, ITariffDto>> {
     const transactionIdToTariffMap = new Map<string, ITariffDto>();
     for (const transaction of transactions) {
+      // If tariffId is missing (e.g. partial transaction), fetch it from the DB
+      if (!transaction.tariff && !transaction.tariffId && transaction.id) {
+        const txResult = await this.ocpiGraphqlClient.request<
+          GetTransactionByTransactionIdQueryResult,
+          GetTransactionByTransactionIdQueryVariables
+        >(GET_TRANSACTION_BY_ID_QUERY, { id: transaction.id });
+        if (txResult.Transactions[0]?.tariffId) {
+          transaction.tariffId = txResult.Transactions[0].tariffId;
+        }
+      }
       if (!transaction.tariff && transaction.tariffId) {
         const result = await this.ocpiGraphqlClient.request<
           GetTariffByKeyQueryResult,
