@@ -2,38 +2,18 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  IChargingStationDto,
+  IConnectorDto,
+  IEvseDto,
+  ILocationDto,
+  ITenantPartnerDto,
+} from '@citrineos/base';
 import { ILogObj, Logger } from 'tslog';
 import { Service } from 'typedi';
-import {
-  LocationResponse,
-  PaginatedLocationResponse,
-} from '../model/DTO/LocationDTO';
-import { EvseResponse } from '../model/DTO/EvseDTO';
-import { ConnectorResponse } from '../model/DTO/ConnectorDTO';
 import { PaginatedParams } from '../controllers/param/PaginatedParams';
-import {
-  buildOcpiPaginatedResponse,
-  DEFAULT_LIMIT,
-  DEFAULT_OFFSET,
-} from '../model/PaginatedResponse';
-import {
-  buildOcpiResponse,
-  OcpiResponseStatusCode,
-} from '../model/OcpiResponse';
-import { buildOcpiErrorResponse } from '../model/OcpiErrorResponse';
 import { NotFoundException } from '../exception/NotFoundException';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
-import {
-  GET_CONNECTOR_BY_ID_QUERY,
-  GET_EVSE_BY_ID_QUERY,
-  GET_LOCATION_BY_ID_QUERY,
-  GET_LOCATIONS_QUERY,
-} from '../graphql/queries/location.queries';
-import {
-  LocationMapper,
-  EvseMapper,
-  ConnectorMapper,
-} from '../mapper/LocationMapper';
 import {
   GetConnectorByIdQueryResult,
   GetConnectorByIdQueryVariables,
@@ -46,12 +26,32 @@ import {
   Locations_Bool_Exp,
 } from '../graphql/operations';
 import {
-  IChargingStationDto,
-  IConnectorDto,
-  IEvseDto,
-  ILocationDto,
-  ITenantPartnerDto,
-} from '@citrineos/base';
+  GET_CONNECTOR_BY_ID_QUERY,
+  GET_EVSE_BY_ID_QUERY,
+  GET_LOCATION_BY_ID_QUERY,
+  GET_LOCATIONS_QUERY,
+} from '../graphql/queries/location.queries';
+import {
+  ConnectorMapper,
+  EvseMapper,
+  LocationMapper,
+} from '../mapper/LocationMapper';
+import { ConnectorResponse } from '../model/DTO/ConnectorDTO';
+import { EvseResponse } from '../model/DTO/EvseDTO';
+import {
+  LocationResponse,
+  PaginatedLocationResponse,
+} from '../model/DTO/LocationDTO';
+import { buildOcpiErrorResponse } from '../model/OcpiErrorResponse';
+import {
+  buildOcpiResponse,
+  OcpiResponseStatusCode,
+} from '../model/OcpiResponse';
+import {
+  buildOcpiPaginatedResponse,
+  DEFAULT_LIMIT,
+  DEFAULT_OFFSET,
+} from '../model/PaginatedResponse';
 
 @Service()
 export class LocationsService {
@@ -67,6 +67,7 @@ export class LocationsService {
   async getLocations(
     tenant: Required<Pick<ITenantPartnerDto, 'countryCode' | 'partyId'>>,
     paginatedParams?: PaginatedParams,
+    tenantPartnerId?: number,
   ): Promise<PaginatedLocationResponse> {
     this.logger.debug(
       `Getting all locations for ${JSON.stringify(tenant)} and parameters ${JSON.stringify(paginatedParams)}`,
@@ -79,6 +80,11 @@ export class LocationsService {
         partyId: { _eq: tenant.partyId },
       },
     };
+    if (tenantPartnerId) {
+      where.TenantPartnerLocations = {
+        tenantPartnerId: { _eq: tenantPartnerId },
+      };
+    }
     const dateFilters: any = {};
     if (paginatedParams?.dateFrom)
       dateFilters._gte = paginatedParams.dateFrom.toISOString();
