@@ -2,36 +2,39 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { IRequestOptions, IRestResponse, RestClient } from 'typed-rest-client';
-import { IHeaders, IRequestQueryParams } from 'typed-rest-client/Interfaces';
-import { VersionNumber } from '../model/VersionNumber';
-import { UnsuccessfulRequestException } from '../exception/UnsuccessfulRequestException';
 import {
   HttpHeader,
   HttpMethod,
   ITenantPartnerDto,
   OCPIRegistration,
 } from '@citrineos/base';
-import { OcpiHttpHeader } from '../util/OcpiHttpHeader';
-import { base64Encode } from '../util/Util';
+import { ILogObj, Logger } from 'tslog';
+import { IRequestOptions, IRestResponse, RestClient } from 'typed-rest-client';
+import { IHeaders, IRequestQueryParams } from 'typed-rest-client/Interfaces';
 import { Inject } from 'typedi';
 import { v4 as uuidv4 } from 'uuid';
-import { ModuleId } from '../model/ModuleId';
-import { ILogObj, Logger } from 'tslog';
-import { InterfaceRole } from '../model/InterfaceRole';
-import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
-import {
-  GET_TENANT_PARTNER_BY_CPO_AND_AND_CLIENT,
-  LIST_TENANT_PARTNERS_BY_CPO,
-} from '../graphql/queries/tenantPartner.queries';
-import { PaginatedParams } from './param/PaginatedParams';
 import { ZodTypeAny } from 'zod';
+import { UnsuccessfulRequestException } from '../exception/UnsuccessfulRequestException';
+import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import {
   GetTenantPartnerByCpoClientAndModuleIdQueryResult,
   GetTenantPartnerByCpoClientAndModuleIdQueryVariables,
+  TenantPartnersListByLocationQueryResult,
+  TenantPartnersListByLocationQueryVariables,
   TenantPartnersListQueryResult,
   TenantPartnersListQueryVariables,
 } from '../graphql/operations';
+import {
+  GET_TENANT_PARTNER_BY_CPO_AND_AND_CLIENT,
+  LIST_TENANT_PARTNERS_BY_CPO,
+  LIST_TENANT_PARTNERS_BY_CPO_AND_LOCATION,
+} from '../graphql/queries/tenantPartner.queries';
+import { InterfaceRole } from '../model/InterfaceRole';
+import { ModuleId } from '../model/ModuleId';
+import { VersionNumber } from '../model/VersionNumber';
+import { OcpiHttpHeader } from '../util/OcpiHttpHeader';
+import { base64Encode } from '../util/Util';
+import { PaginatedParams } from './param/PaginatedParams';
 
 export interface RequiredOcpiParams {
   clientUrl: string;
@@ -64,6 +67,7 @@ export interface BroadcastParams<T extends ZodTypeAny> {
   paginatedParams?: PaginatedParams;
   otherParams?: Record<string, string | number | (string | number)[]>;
   path?: string;
+  locationId?: number;
 }
 
 export interface BroadcastResponse<T> {
@@ -286,6 +290,7 @@ export abstract class BaseClientApi {
       paginatedParams,
       otherParams,
       path,
+      locationId,
     } = params;
     this.logger.debug(
       `Broadcasting to clients for ${moduleId}_${interfaceRole}`,
@@ -296,15 +301,30 @@ export abstract class BaseClientApi {
     this.logger.debug(`Using URL: ${url} with path ${path}`);
     const successes: Array<{ partner: ITenantPartnerDto; response: T }> = [];
     const failures: Array<{ partner: ITenantPartnerDto; error: Error }> = [];
-    const response = await this.ocpiGraphqlClient.request<
-      TenantPartnersListQueryResult,
-      TenantPartnersListQueryVariables
-    >(LIST_TENANT_PARTNERS_BY_CPO, {
-      cpoCountryCode,
-      cpoPartyId,
-      endpointIdentifier: `${moduleId}_${interfaceRole}`,
-    });
-    const partners = response.TenantPartners as ITenantPartnerDto[];
+    const endpointIdentifier = `${moduleId}_${interfaceRole}`;
+    let partners: ITenantPartnerDto[];
+    if (locationId !== undefined) {
+      const response = await this.ocpiGraphqlClient.request<
+        TenantPartnersListByLocationQueryResult,
+        TenantPartnersListByLocationQueryVariables
+      >(LIST_TENANT_PARTNERS_BY_CPO_AND_LOCATION, {
+        cpoCountryCode,
+        cpoPartyId,
+        endpointIdentifier,
+        locationId,
+      });
+      partners = response.TenantPartners as ITenantPartnerDto[];
+    } else {
+      const response = await this.ocpiGraphqlClient.request<
+        TenantPartnersListQueryResult,
+        TenantPartnersListQueryVariables
+      >(LIST_TENANT_PARTNERS_BY_CPO, {
+        cpoCountryCode,
+        cpoPartyId,
+        endpointIdentifier,
+      });
+      partners = response.TenantPartners as ITenantPartnerDto[];
+    }
     for (const partner of partners) {
       this.logger.debug(
         `Broadcasting partner ${partner.countryCode}_${partner.partyId}`,

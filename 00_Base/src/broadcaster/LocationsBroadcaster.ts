@@ -2,16 +2,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { BaseBroadcaster } from './BaseBroadcaster';
-import { Service } from 'typedi';
-import { LocationsClientApi } from '../trigger/LocationsClientApi';
-import { ILogObj, Logger } from 'tslog';
-import { CredentialsService } from '../services/CredentialsService';
-import { LocationDTO } from '../model/DTO/LocationDTO';
-import { EvseDTO } from '../model/DTO/EvseDTO';
-import { ConnectorDTO } from '../model/DTO/ConnectorDTO';
-import { ModuleId } from '../model/ModuleId';
-import { InterfaceRole } from '../model/InterfaceRole';
 import {
   HttpMethod,
   IConnectorDto,
@@ -19,15 +9,24 @@ import {
   ILocationDto,
   ITenantDto,
 } from '@citrineos/base';
-import { UID_FORMAT } from '../model/DTO/EvseDTO';
+import { ILogObj, Logger } from 'tslog';
+import { Service } from 'typedi';
 import {
   ConnectorMapper,
   EvseMapper,
   LocationMapper,
 } from '../mapper/LocationMapper';
-import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
+import { ConnectorDTO } from '../model/DTO/ConnectorDTO';
+import { EvseDTO, UID_FORMAT } from '../model/DTO/EvseDTO';
+import { LocationDTO } from '../model/DTO/LocationDTO';
 import { EvseStatus } from '../model/EvseStatus';
+import { InterfaceRole } from '../model/InterfaceRole';
+import { ModuleId } from '../model/ModuleId';
+import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
+import { CredentialsService } from '../services/CredentialsService';
+import { LocationsClientApi } from '../trigger/LocationsClientApi';
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
+import { BaseBroadcaster } from './BaseBroadcaster';
 
 @Service()
 export class LocationsBroadcaster extends BaseBroadcaster {
@@ -45,7 +44,13 @@ export class LocationsBroadcaster extends BaseBroadcaster {
   ): Promise<void> {
     const location = LocationMapper.fromGraphql(locationDto);
     const path = `/${tenant.countryCode}/${tenant.partyId}/${location.id}`;
-    await this.broadcastLocation(tenant, location, HttpMethod.Put, path);
+    await this.broadcastLocation(
+      tenant,
+      location,
+      HttpMethod.Put,
+      path,
+      locationDto.id,
+    );
   }
 
   async broadcastPatchLocation(
@@ -56,7 +61,13 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     if (!locationId) throw new Error('Location ID missing');
     const location = LocationMapper.fromPartialGraphql(locationDto);
     const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}`;
-    await this.broadcastLocation(tenant, location, HttpMethod.Patch, path);
+    await this.broadcastLocation(
+      tenant,
+      location,
+      HttpMethod.Patch,
+      path,
+      locationId,
+    );
   }
 
   private async broadcastLocation(
@@ -64,6 +75,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     location: Partial<LocationDTO>,
     method: HttpMethod,
     path: string,
+    locationId?: number,
   ): Promise<void> {
     try {
       await this.locationsClientApi.broadcastToClients({
@@ -75,6 +87,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
         schema: OcpiEmptyResponseSchema,
         body: location,
         path: path,
+        locationId,
       });
     } catch (e) {
       this.logger.error(
@@ -90,7 +103,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     const evse = EvseMapper.fromGraphql(evseDto.chargingStation!, evseDto);
     if (!evse) throw new Error('Failed to map EVSE data');
     const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(evseDto.stationId, evseDto.id!)}`;
-    await this.broadcastEvse(tenant, evse, HttpMethod.Put, path);
+    await this.broadcastEvse(tenant, evse, HttpMethod.Put, path, locationId);
   }
 
   async broadcastPatchEvseStatus(
@@ -105,7 +118,13 @@ export class LocationsBroadcaster extends BaseBroadcaster {
       status: aggregatedStatus,
       last_updated: toISOStringIfNeeded(evseDto.updatedAt),
     };
-    await this.broadcastEvse(tenant, evseData, HttpMethod.Patch, path);
+    await this.broadcastEvse(
+      tenant,
+      evseData,
+      HttpMethod.Patch,
+      path,
+      locationId,
+    );
   }
 
   async broadcastPatchEvse(
@@ -120,7 +139,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     );
     if (!evse) throw new Error('Failed to map EVSE data');
     const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(evseDto.stationId!, evseDto.id!)}`;
-    await this.broadcastEvse(tenant, evse, HttpMethod.Patch, path);
+    await this.broadcastEvse(tenant, evse, HttpMethod.Patch, path, locationId);
   }
 
   private async broadcastEvse(
@@ -128,6 +147,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     evseData: Partial<EvseDTO>,
     method: HttpMethod,
     path: string,
+    locationId?: number,
   ): Promise<void> {
     try {
       await this.locationsClientApi.broadcastToClients({
@@ -139,6 +159,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
         schema: OcpiEmptyResponseSchema,
         body: evseData,
         path: path,
+        locationId,
       });
     } catch (e) {
       this.logger.error(`broadcast${method}Evse failed for ${path}`, e);
@@ -154,7 +175,13 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     const connector = ConnectorMapper.fromGraphql(connectorDto);
     if (!connector) throw new Error('Failed to map Connector data');
     const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(connectorDto.stationId, connectorDto.evseId)}/${connectorDto.id}`;
-    await this.broadcastConnector(tenant, connector, HttpMethod.Put, path);
+    await this.broadcastConnector(
+      tenant,
+      connector,
+      HttpMethod.Put,
+      path,
+      locationId,
+    );
   }
 
   async broadcastPatchConnector(
@@ -166,7 +193,13 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     const connector = ConnectorMapper.fromPartialGraphql(connectorDto);
     if (!connector) throw new Error('Failed to map Connector data');
     const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(connectorDto.stationId!, connectorDto.evseId!)}/${connectorDto.id}`;
-    await this.broadcastConnector(tenant, connector, HttpMethod.Patch, path);
+    await this.broadcastConnector(
+      tenant,
+      connector,
+      HttpMethod.Patch,
+      path,
+      locationId,
+    );
   }
 
   private async broadcastConnector(
@@ -174,6 +207,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
     connectorData: Partial<ConnectorDTO>,
     method: HttpMethod,
     path: string,
+    locationId?: number,
   ): Promise<void> {
     try {
       await this.locationsClientApi.broadcastToClients({
@@ -185,6 +219,7 @@ export class LocationsBroadcaster extends BaseBroadcaster {
         schema: OcpiEmptyResponseSchema,
         body: connectorData,
         path: path,
+        locationId,
       });
     } catch (e) {
       this.logger.error(`broadcast${method}Connector failed for ${path}`, e);

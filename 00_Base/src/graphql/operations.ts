@@ -584,6 +584,16 @@ export type TenantPartnersListQueryResult = {
   }>;
 };
 
+export type TenantPartnersListByLocationQueryVariables = Exact<{
+  cpoCountryCode: Scalars['String']['input'];
+  cpoPartyId: Scalars['String']['input'];
+  endpointIdentifier: Scalars['String']['input'];
+  locationId: Scalars['Int']['input'];
+}>;
+
+export type TenantPartnersListByLocationQueryResult =
+  TenantPartnersListQueryResult;
+
 export type GetTenantByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
