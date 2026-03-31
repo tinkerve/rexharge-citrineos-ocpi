@@ -2,21 +2,23 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Service } from 'typedi';
-import { Cdr } from '../model/Cdr';
-import { Session } from '../model/Session';
-import { SessionMapper } from './SessionMapper';
-import { CdrLocation } from '../model/CdrLocation';
-import { Price } from '../model/Price';
-import { Tariff as OcpiTariff } from '../model/Tariff';
-import { SignedData } from '../model/SignedData';
-import { LocationDTO } from '../model/DTO/LocationDTO';
-import { BaseTransactionMapper } from './BaseTransactionMapper';
-import { ILogObj, Logger } from 'tslog';
-import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
-import { LocationsService } from '../services/LocationsService';
 import { ITariffDto, ITransactionDto } from '@citrineos/base';
+import { ILogObj, Logger } from 'tslog';
+import { Service } from 'typedi';
+import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
+import { Cdr } from '../model/Cdr';
+import { CdrDimensionType } from '../model/CdrDimensionType';
+import { CdrLocation } from '../model/CdrLocation';
+import { LocationDTO } from '../model/DTO/LocationDTO';
+import { Price } from '../model/Price';
+import { Session } from '../model/Session';
+import { SignedData } from '../model/SignedData';
+import { Tariff as OcpiTariff } from '../model/Tariff';
+import { LocationsService } from '../services/LocationsService';
+import { MINUTES_IN_HOUR } from '../util/Consts';
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
+import { BaseTransactionMapper } from './BaseTransactionMapper';
+import { SessionMapper } from './SessionMapper';
 
 @Service()
 export class CdrMapper extends BaseTransactionMapper {
@@ -96,6 +98,19 @@ export class CdrMapper extends BaseTransactionMapper {
     tariff: ITariffDto,
     ocpiTariff: OcpiTariff,
   ): Promise<Cdr> {
+    const totalEnergy = session.kwh;
+    const totalTime = this.calculateTotalTime(session);
+    const totalParkingTime = this.calculateTotalParkingTimeFromPeriods(session);
+
+    const totalEnergyCost = this.computeEnergyCost(totalEnergy, tariff);
+    const totalTimeCost = this.computeTimeCost(totalTime, tariff);
+    const totalFixedCost = this.computeFixedCost(tariff);
+
+    const totalCost = this.sumCosts(
+      [totalEnergyCost, totalTimeCost, totalFixedCost],
+      tariff,
+    );
+
     return {
       country_code: session.country_code,
       party_id: session.party_id,
@@ -112,19 +127,15 @@ export class CdrMapper extends BaseTransactionMapper {
       tariffs: [ocpiTariff],
       charging_periods: session.charging_periods || [],
       signed_data: await this.getSignedData(session),
-      // TODO: Map based on OCPI Tariff
-      total_cost: this.calculateTotalCost(session.kwh, tariff.pricePerKwh),
-      total_fixed_cost: await this.calculateTotalFixedCost(tariff),
-      total_energy: session.kwh,
-      total_energy_cost: await this.calculateTotalEnergyCost(session, tariff),
-      total_time: this.calculateTotalTime(session),
-      total_time_cost: await this.calculateTotalTimeCost(session, tariff),
-      total_parking_time: await this.calculateTotalParkingTime(session),
-      total_parking_cost: await this.calculateTotalParkingCost(session, tariff),
-      total_reservation_cost: await this.calculateTotalReservationCost(
-        session,
-        tariff,
-      ),
+      total_cost: totalCost,
+      total_fixed_cost: totalFixedCost,
+      total_energy: totalEnergy,
+      total_energy_cost: totalEnergyCost,
+      total_time: totalTime,
+      total_time_cost: totalTimeCost,
+      total_parking_time: totalParkingTime,
+      total_parking_cost: undefined,
+      total_reservation_cost: undefined,
       remark: this.generateRemark(session),
       invoice_reference_id: await this.generateInvoiceReferenceId(session),
       credit: this.isCredit(session, tariff),
@@ -205,19 +216,88 @@ export class CdrMapper extends BaseTransactionMapper {
     return undefined;
   }
 
-  private async calculateTotalFixedCost(
-    _tariff: any,
-  ): Promise<Price | undefined> {
-    // TODO: Return total fixed cost if needed
-    return undefined;
+  /**
+   * Flat session fee (OCPI FLAT tariff dimension).
+   * Returns undefined if no per-session fee is configured on the tariff.
+   */
+  private computeFixedCost(tariff: ITariffDto): Price | undefined {
+    if (!tariff.pricePerSession) return undefined;
+    const excl_vat = this.round4(tariff.pricePerSession);
+    return this.buildPrice(excl_vat, tariff.taxRate);
   }
 
-  private async calculateTotalEnergyCost(
-    _session: Session,
-    _tariff: ITariffDto,
-  ): Promise<Price | undefined> {
-    // TODO: Return total energy cost if needed
-    return undefined;
+  /**
+   * Energy cost: kWh consumed × pricePerKwh (OCPI ENERGY tariff dimension).
+   * Returns undefined when the tariff has no energy rate.
+   */
+  private computeEnergyCost(
+    totalKwh: number,
+    tariff: ITariffDto,
+  ): Price | undefined {
+    if (!tariff.pricePerKwh) return undefined;
+    const excl_vat = this.round4(totalKwh * tariff.pricePerKwh);
+    return this.buildPrice(excl_vat, tariff.taxRate);
+  }
+
+  /**
+   * Time cost: session duration in hours × pricePerMin × 60 (OCPI TIME dimension).
+   * TariffMapper stores the TIME price component as pricePerMin*60 (per-hour rate),
+   * so we multiply total_time (hours) by that same per-hour rate here.
+   * Returns undefined when the tariff has no time rate.
+   */
+  private computeTimeCost(
+    totalTimeHours: number,
+    tariff: ITariffDto,
+  ): Price | undefined {
+    if (!tariff.pricePerMin) return undefined;
+    const pricePerHour = tariff.pricePerMin * MINUTES_IN_HOUR;
+    const excl_vat = this.round4(totalTimeHours * pricePerHour);
+    return this.buildPrice(excl_vat, tariff.taxRate);
+  }
+
+  /**
+   * Sum PARKING_TIME CdrDimension volumes from charging periods.
+   * Per OCPI 2.2.1 spec the volume unit for PARKING_TIME is hours.
+   */
+  private calculateTotalParkingTimeFromPeriods(session: Session): number {
+    let totalHours = 0;
+    for (const period of session.charging_periods ?? []) {
+      for (const dim of period.dimensions) {
+        if (dim.type === CdrDimensionType.PARKING_TIME) {
+          totalHours += dim.volume;
+        }
+      }
+    }
+    return totalHours;
+  }
+
+  /**
+   * Grand total cost = sum of all non-null cost components.
+   * Includes incl_vat when a taxRate is present on the tariff.
+   */
+  private sumCosts(costs: (Price | undefined)[], tariff: ITariffDto): Price {
+    const excl_vat = costs.reduce(
+      (acc, cost) => acc + (cost?.excl_vat ?? 0),
+      0,
+    );
+    return this.buildPrice(this.round4(excl_vat), tariff.taxRate);
+  }
+
+  /**
+   * Build a Price with optional incl_vat derived from taxRate.
+   */
+  private buildPrice(excl_vat: number, taxRate?: number | null): Price {
+    if (taxRate) {
+      return {
+        excl_vat,
+        incl_vat: this.round4(excl_vat * (1 + taxRate)),
+      };
+    }
+    return { excl_vat };
+  }
+
+  private round4(value: number): number {
+    return Math.round(value * 10000) / 10000;
   }
 
   private calculateTotalTime(session: Session): number {
@@ -229,35 +309,6 @@ export class CdrMapper extends BaseTransactionMapper {
       ); // Convert ms to hours
     }
     return 0;
-  }
-
-  private async calculateTotalTimeCost(
-    _session: Session,
-    _tariff: ITariffDto,
-  ): Promise<Price | undefined> {
-    // TODO: Return total time cost if needed
-    return undefined;
-  }
-
-  private async calculateTotalParkingTime(_session: Session): Promise<number> {
-    // TODO: Return total parking time if needed
-    return 0;
-  }
-
-  private async calculateTotalParkingCost(
-    _session: Session,
-    _tariff: ITariffDto,
-  ): Promise<Price | undefined> {
-    // TODO: Return total parking cost if needed
-    return undefined;
-  }
-
-  private async calculateTotalReservationCost(
-    _session: Session,
-    _tariff: ITariffDto,
-  ): Promise<Price | undefined> {
-    // TODO: Return total reservation cost if needed
-    return undefined;
   }
 
   private generateRemark(_session: Session): string | undefined {

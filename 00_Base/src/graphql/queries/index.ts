@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+export * from './cdr.queries';
 export * from './chargingStation.queries';
 export * from './chargingStationSequence.queries';
 // export * from './cpoTenant.queries';
