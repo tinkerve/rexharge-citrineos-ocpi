@@ -13,6 +13,8 @@
 **/*.js
 # Exclude config files
 !**/config/**/*.js
+# Keep Hasura deploy helpers
+!**/scripts/**/*.js
 **/*.cjs
 **/*.md
 **/*.yml
@@ -23,4 +25,4 @@
 **/*.Dockerfile
 
 # Specific directories to ignore
-**/data
+Server/data/directus/

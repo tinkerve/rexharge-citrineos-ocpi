@@ -15,6 +15,8 @@ services:
       DB_PASS: "postgres"
       AMQP_URL: "amqp://guest:guest@amqp-broker:5672"
       AMQP_EXCHANGE: "citrineos"
+      HASURA_GRAPHQL_ENDPOINT: "http://graphql-engine:8080"
+      HASURA_GRAPHQL_ADMIN_SECRET: ${DOCKER_HASURA_GRAPHQL_ADMIN_SECRET}
     ports:
       - 8085:8085
       # - 9229:9229
