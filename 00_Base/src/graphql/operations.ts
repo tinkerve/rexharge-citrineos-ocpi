@@ -47,6 +47,13 @@ export type Authorizations_Set_Input = {
 export type Locations_Bool_Exp = {
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
   Tenant?: InputMaybe<Tenants_Bool_Exp>;
+  TenantPartnerLocations?: InputMaybe<TenantPartnerLocations_Bool_Exp>;
+};
+export type TenantPartnerLocations_Bool_Exp = {
+  tenantPartnerId?: InputMaybe<Int_Comparison_Exp>;
+};
+export type Int_Comparison_Exp = {
+  _eq?: InputMaybe<Scalars['Int']['input']>;
 };
 export type Tariffs_Bool_Exp = {
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
@@ -607,6 +614,16 @@ export type TenantPartnersListQueryResult = {
     };
   }>;
 };
+
+export type TenantPartnersListByLocationQueryVariables = Exact<{
+  cpoCountryCode: Scalars['String']['input'];
+  cpoPartyId: Scalars['String']['input'];
+  endpointIdentifier: Scalars['String']['input'];
+  locationId: Scalars['Int']['input'];
+}>;
+
+export type TenantPartnersListByLocationQueryResult =
+  TenantPartnersListQueryResult;
 
 export type GetTenantByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];

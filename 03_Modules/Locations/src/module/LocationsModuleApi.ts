@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Ctx, Get, JsonController, Param } from 'routing-controllers';
-import { ILocationsModuleApi } from './ILocationsModuleApi';
+import { HttpStatus, ITenantPartnerDto } from '@citrineos/base';
 import {
   AsOcpiFunctionalEndpoint,
   BaseController,
@@ -15,7 +14,6 @@ import {
   EvseResponseSchemaName,
   EXTRACT_EVSE_ID,
   EXTRACT_STATION_ID,
-  FunctionalEndpointParams,
   generateMockForSchema,
   generateMockOcpiPaginatedResponse,
   LocationResponse,
@@ -33,8 +31,9 @@ import {
   VersionNumber,
   VersionNumberParam,
 } from '@citrineos/ocpi-base';
+import { Ctx, Get, JsonController, Param } from 'routing-controllers';
 import { Service } from 'typedi';
-import { HttpStatus, ITenantPartnerDto } from '@citrineos/base';
+import { ILocationsModuleApi } from './ILocationsModuleApi';
 
 const MOCK_PAGINATED_LOCATION = generateMockOcpiPaginatedResponse(
   PaginatedLocationResponseSchema,
@@ -101,6 +100,7 @@ export class LocationsModuleApi
         partyId: tenantPartner.tenant!.partyId!,
       },
       paginatedParams,
+      tenantPartner.id,
     );
   }
 

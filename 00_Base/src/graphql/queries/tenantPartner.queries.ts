@@ -123,3 +123,37 @@ export const LIST_TENANT_PARTNERS_BY_CPO = gql`
     }
   }
 `;
+
+export const LIST_TENANT_PARTNERS_BY_CPO_AND_LOCATION = gql`
+  query TenantPartnersListByLocation(
+    $cpoCountryCode: String!
+    $cpoPartyId: String!
+    $endpointIdentifier: String!
+    $locationId: Int!
+  ) {
+    TenantPartners(
+      where: {
+        Tenant: {
+          countryCode: { _eq: $cpoCountryCode }
+          partyId: { _eq: $cpoPartyId }
+        }
+        partnerProfileOCPI: {
+          _contains: { endpoints: [{ identifier: $endpointIdentifier }] }
+        }
+        TenantPartnerLocations: { locationId: { _eq: $locationId } }
+      }
+    ) {
+      id
+      countryCode
+      partyId
+      partnerProfileOCPI
+      tenantId
+      tenant: Tenant {
+        id
+        countryCode
+        partyId
+        serverProfileOCPI
+      }
+    }
+  }
+`;
