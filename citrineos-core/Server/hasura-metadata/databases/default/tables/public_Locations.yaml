@@ -1,0 +1,42 @@
+table:
+  name: Locations
+  schema: public
+object_relationships:
+  - name: Tenant
+    using:
+      foreign_key_constraint_on: tenantId
+array_relationships:
+  - name: ChargingStations
+    using:
+      foreign_key_constraint_on:
+        column: locationId
+        table:
+          name: ChargingStations
+          schema: public
+  - name: Transactions
+    using:
+      foreign_key_constraint_on:
+        column: locationId
+        table:
+          name: Transactions
+          schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - address
+        - city
+        - country
+        - name
+        - postalCode
+        - state
+        - id
+        - tenantId
+        - createdAt
+        - updatedAt
+        - coordinates
+      filter:
+        tenantId:
+          _eq: x-hasura-tenant-id
+      allow_aggregations: true
+    comment: ""

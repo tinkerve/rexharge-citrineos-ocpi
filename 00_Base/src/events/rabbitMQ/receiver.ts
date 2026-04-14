@@ -124,6 +124,8 @@ export class RabbitMqDtoReceiver
     while (!abortSignal?.aborted) {
       try {
         const connection = await amqplib.connect(url);
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         this._connection = connection.connection;
         const channel = await connection.createChannel();
         channel.on('error', (err) => {

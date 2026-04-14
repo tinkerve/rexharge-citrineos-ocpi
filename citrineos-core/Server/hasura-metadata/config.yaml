@@ -1,0 +1,4 @@
+version: 3
+endpoint: http://localhost:8090
+admin_secret: CitrineOS!
+metadata_directory: .

@@ -1,0 +1,41 @@
+services:
+  citrineos-ocpi:
+    image: ghcr.io/tinkerve/rexharge-citrineos-ocpi:latest
+    deploy:
+      labels:
+        # HTTP API Swagger UI
+        - traefik.enable=true
+        - traefik.http.routers.citrine-ocpi.service=citrine-ocpi
+        - traefik.http.routers.citrine-ocpi.entrypoints=websecure
+        - traefik.http.routers.citrine-ocpi.rule=Host(`ocpi.app.rexharge.net`)
+        - traefik.http.routers.citrine-ocpi.tls.certresolver=leresolver
+        - traefik.http.services.citrine-ocpi.loadbalancer.server.port=8085
+    environment:
+      APP_NAME: 'all'
+      APP_ENV: 'docker'
+      DB_HOST: ${DOCKER_DATABASE_HOST}
+      DB_USER: ${DOCKER_DATABASE_USERNAME}
+      DB_PASS: ${DOCKER_DATABASE_PASSWORD}
+      HASURA_GRAPHQL_ENDPOINT: ${DOCKER_HASURA_GRAPHQL_ENDPOINT}
+      HASURA_GRAPHQL_ADMIN_SECRET: ${DOCKER_HASURA_GRAPHQL_ADMIN_SECRET}
+      REDIS_HOST: ${DOCKER_REDIS_HOST}
+      REDIS_PORT: ${DOCKER_REDIS_PORT}
+      REDIS_PASSWORD: ${DOCKER_REDIS_PASSWORD}
+      COMMANDS_OCPI_BASE_URL: ${DOCKER_CITRINEOS_OCPI_BASE_URL}
+      COMMANDS_OCPP1_6_REMOTE_START_TRANSACTION_REQUEST_URL: ${DOCKER_CITRINEOS_OCPP1_6_REMOTE_START_TRANSACTION_REQUEST_URL}
+      COMMANDS_OCPP1_6_REMOTE_STOP_TRANSACTION_REQUEST_URL: ${DOCKER_CITRINEOS_OCPP1_6_REMOTE_STOP_TRANSACTION_REQUEST_URL}
+      COMMANDS_OCPP1_6_UNLOCK_CONNECTOR_REQUEST_URL: ${DOCKER_CITRINEOS_OCPP1_6_UNLOCK_CONNECTOR_REQUEST_URL}
+      COMMANDS_OCPP2_0_1_REQUEST_START_TRANSACTION_REQUEST_URL: ${DOCKER_CITRINEOS_OCPP2_0_1_REMOTE_START_TRANSACTION_REQUEST_URL}
+      COMMANDS_OCPP2_0_1_REQUEST_STOP_TRANSACTION_REQUEST_URL: ${DOCKER_CITRINEOS_OCPP2_0_1_REMOTE_STOP_TRANSACTION_REQUEST_URL}
+      COMMANDS_OCPP2_0_1_UNLOCK_CONNECTOR_REQUEST_URL: ${DOCKER_CITRINEOS_OCPP2_0_1_UNLOCK_CONNECTOR_REQUEST_URL}
+      AMQP_URL: ${DOCKER_RABBITMQ_URL}
+      AMQP_EXCHANGE: ${DOCKER_CITRINEOS_OCPI_AMQP_EXCHANGE}
+    networks:
+      - rexharge_network
+      - traefik_proxy
+
+networks:
+  rexharge_network:
+    external: true
+  traefik_proxy:
+    external: true
