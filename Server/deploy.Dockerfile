@@ -8,6 +8,9 @@ COPY . .
 # INSTALL
 RUN npm run install-all
 
+# BUILD citrineos-core workspace dependencies (excluded from root tsconfig, dist not in docker context)
+RUN npx tsc --build ./citrineos-core/02_Util/tsconfig.json
+
 # BUILD
 RUN npm run build
 
