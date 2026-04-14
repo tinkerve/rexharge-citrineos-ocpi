@@ -1,3 +1,10 @@
 table:
   name: CdrRecords
   schema: public
+object_relationships:
+  - name: TenantPartner
+    using:
+      foreign_key_constraint_on: tenantPartnerId
+  - name: Transaction
+    using:
+      foreign_key_constraint_on: transactionId
