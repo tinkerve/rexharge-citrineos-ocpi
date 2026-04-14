@@ -4,6 +4,11 @@
     "rootDir": "./",
     "outDir": "./dist"
   },
+  "include": [
+    "./00_Base/src/**/*.ts",
+    "./03_Modules/*/src/**/*.ts",
+    "./Server/src/**/*.ts"
+  ],
   "exclude": ["./dist/**/*", "**/node_modules/**"],
   "references": [
     {

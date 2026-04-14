@@ -25,7 +25,7 @@
   },
   "workspaces": [
     "../00_Base",
-    "../../citrineos-core/00_Base",
-    "../../citrineos-core/01_Data"
+    "../citrineos-core/00_Base",
+    "../citrineos-core/01_Data"
   ]
 }

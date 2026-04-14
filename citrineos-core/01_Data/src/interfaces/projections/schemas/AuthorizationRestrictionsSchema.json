@@ -1,0 +1,20 @@
+{
+  "$id": "AuthorizationRestrictionsSchema",
+  "type": "object",
+  "properties": {
+    "allowedConnectorTypes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disallowedEvseIdPrefixes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

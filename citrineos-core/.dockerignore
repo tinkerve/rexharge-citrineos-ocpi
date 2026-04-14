@@ -1,0 +1,30 @@
+# Ignore node modules directories
+**/node_modules
+
+# Ignore distribution directories (lib for backwards compatibility)
+**/dist
+**/lib
+
+# Common ignore files
+.gitignore
+
+# Specific files and file types to ignore
+**/*.js
+**/*.cjs
+**/*.md
+**/*.yml
+**/*.tsbuildinfo
+**/*.log
+**/*.tgz
+**/*.Dockerfile
+
+# Specific directories to ignore
+**/DirectusExtensions
+**/Swarm
+**/data
+
+# include sequelize bridge
+!Server/
+!Server/src/
+!Server/src/config/
+!Server/src/config/sequelize.bridge.config.js

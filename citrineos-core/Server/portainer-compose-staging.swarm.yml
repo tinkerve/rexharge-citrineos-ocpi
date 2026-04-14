@@ -1,0 +1,233 @@
+x-common-environment: &common-environment
+  APP_ENV: 'docker'
+  BOOTSTRAP_CITRINEOS_DATABASE_HOST: ${DOCKER_DATABASE_HOST}
+  BOOTSTRAP_CITRINEOS_DATABASE_USERNAME: ${DOCKER_DATABASE_USERNAME}
+  BOOTSTRAP_CITRINEOS_DATABASE_PASSWORD: ${DOCKER_DATABASE_PASSWORD}
+  BOOTSTRAP_CITRINEOS_CONFIG_FILENAME: 'config.json'
+  BOOTSTRAP_CITRINEOS_FILE_ACCESS_TYPE: 'local'
+  BOOTSTRAP_CITRINEOS_FILE_ACCESS_LOCAL_DEFAULT_FILE_PATH: '/data'
+  CITRINEOS_util_messageBroker_amqp_url: ${DOCKER_RABBITMQ_URL}
+
+x-common-depends: &common-depends
+  depends_on:
+    - amqp-broker
+
+x-common-image: &common-image
+  image: ghcr.io/tinkerve/citrineos-server:v1.8.1
+
+services:
+  amqp-broker:
+    image: rabbitmq:3-management
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.citrine-rabbitmq.entrypoints=websecure
+        - traefik.http.routers.citrine-rabbitmq.rule=Host(`citrine-rabbitmq-ui.staging-app.rexharge.net`)
+        - traefik.http.routers.citrine-rabbitmq.tls.certresolver=leresolver
+        - traefik.http.services.citrine-rabbitmq.loadbalancer.server.port=15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${DOCKER_RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${DOCKER_RABBITMQ_DEFAULT_PASS}
+    networks:
+      - rexharge_network
+      - traefik_proxy
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    # healthcheck:
+    #   test: rabbitmq-diagnostics -q ping
+    #   interval: 10s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 60s
+  citrine:
+    <<: [*common-image, *common-depends]
+    ports:
+      #   - 8080:8080
+      - 8081:8081
+      - 8082:8082
+      - 8092:8092
+      #   - 8443:8443
+      #   - 8444:8444
+      #   - 9229:9229
+      #   - 8092:8092
+    deploy:
+      labels:
+        # HTTP API Swagger UI
+        - traefik.enable=true
+        - traefik.http.routers.citrine-core.service=citrine-core
+        - traefik.http.routers.citrine-core.entrypoints=websecure
+        - traefik.http.routers.citrine-core.rule=Host(`citrine-core.staging-app.rexharge.net`)
+        - traefik.http.routers.citrine-core.tls.certresolver=leresolver
+        - traefik.http.services.citrine-core.loadbalancer.server.port=8080
+        # OCPP WebSocket(With Basic HTTP Auth)
+        - traefik.http.routers.citrine-ocpp-ws.service=citrine-ocpp-ws
+        - traefik.http.routers.citrine-ocpp-ws.entrypoints=websecure
+        - traefik.http.routers.citrine-ocpp-ws.rule=Host(`citrine-ws.staging-app.rexharge.net`)
+        - traefik.http.routers.citrine-ocpp-ws.tls.certresolver=leresolver
+        - traefik.http.services.citrine-ocpp-ws.loadbalancer.server.port=8081
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "const net = require(\"net\"); const client = net.createConnection(8080, \"127.0.0.1\", () => { client.end(); process.exit(0); }); client.on(\"error\", () => process.exit(1)); client.setTimeout(5000, () => { client.destroy(); process.exit(1); });"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    environment:
+      APP_NAME: 'all'
+      <<: *common-environment
+    networks:
+      - rexharge_network
+      - traefik_proxy
+
+  graphql-engine:
+    image: hasura/graphql-engine:v2.40.3.cli-migrations-v3
+    volumes:
+      - ./hasura-metadata:/hasura-metadata
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.citrine-hasura.entrypoints=websecure
+        - traefik.http.routers.citrine-hasura.rule=Host(`citrine-hasura.staging-app.rexharge.net`)
+        - traefik.http.routers.citrine-hasura.tls.certresolver=leresolver
+        - traefik.http.services.citrine-hasura.loadbalancer.server.port=8080
+    restart: unless-stopped
+    environment:
+      ## postgres database to store Hasura metadata
+      HASURA_GRAPHQL_DATABASE_URL: ${DOCKER_HASURA_GRAPHQL_DATABASE_URL}
+      ## enable the console served by server
+      HASURA_GRAPHQL_ENABLE_CONSOLE: 'true' # set to "false" to disable console
+      ## enable debugging mode. It is recommended to disable this in production
+      HASURA_GRAPHQL_DEV_MODE: 'true'
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: 'false'
+      ## uncomment next line to run console offline (i.e load console assets from server instead of CDN)
+      # HASURA_GRAPHQL_CONSOLE_ASSETS_DIR: /srv/console-assets
+      ## uncomment next line to set an admin secret - warning, without configuration this will cause upstream services to fail
+      HASURA_GRAPHQL_ADMIN_SECRET: ${DOCKER_HASURA_GRAPHQL_ADMIN_SECRET}
+      HASURA_GRAPHQL_METADATA_DEFAULTS: '{"backend_configs":{"dataconnector":{"athena":{"uri":"http://data-connector-agent:8081/api/v1/athena"},"mariadb":{"uri":"http://data-connector-agent:8081/api/v1/mariadb"},"mysql8":{"uri":"http://data-connector-agent:8081/api/v1/mysql"},"oracle":{"uri":"http://data-connector-agent:8081/api/v1/oracle"},"snowflake":{"uri":"http://data-connector-agent:8081/api/v1/snowflake"}}}}'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/healthz']
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+    networks:
+      - rexharge_network
+      - traefik_proxy
+  # citrine:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8080:8080
+  #     - 8081:8081
+  #     - 8082:8082
+  #   environment:
+  #     APP_NAME: 'general'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # certificates:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8083:8083
+  #   environment:
+  #     APP_NAME: 'certificates'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # configuration:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8084:8084
+  #   volumes:
+  #     - ./:/usr/configuration
+  #     - /usr/configuration/node_modules
+  #   environment:
+  #     APP_NAME: 'configuration'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # evdriver:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8085:8085
+  #   volumes:
+  #     - ./:/usr/evdriver
+  #     - /usr/evdriver/node_modules
+  #   environment:
+  #     APP_NAME: 'evdriver'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # monitoring:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8086:8086
+  #   volumes:
+  #     - ./:/usr/monitoring
+  #     - /usr/monitoring/node_modules
+  #   environment:
+  #     APP_NAME: 'monitoring'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # reporting:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8087:8087
+  #   volumes:
+  #     - ./:/usr/reporting
+  #     - /usr/reporting/node_modules
+  #   environment:
+  #     APP_NAME: 'reporting'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # smartcharging:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8088:8088
+  #   volumes:
+  #     - ./:/usr/smartcharging
+  #     - /usr/smartcharging/node_modules
+  #   environment:
+  #     APP_NAME: 'smartcharging'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # tenant:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8090:8090
+  #   volumes:
+  #     - ./:/usr/tenant
+  #     - /usr/tenant/node_modules
+  #   environment:
+  #     APP_NAME: 'tenant'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+  # transactions:
+  #   <<: [*common-image, *common-depends]
+  #   ports:
+  #     - 8089:8089
+  #   volumes:
+  #     - ./:/usr/transactions
+  #     - /usr/transactions/node_modules
+  #   environment:
+  #     APP_NAME: 'transactions'
+  #     <<: *common-environment
+  #   networks:
+  #     - rexharge_network
+
+networks:
+  rexharge_network:
+    external: true
+  traefik_proxy:
+    external: true
+
+volumes:
+  rabbitmq_data:
+    driver: local

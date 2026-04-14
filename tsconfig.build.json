@@ -6,7 +6,8 @@
     "**/__tests__/*",
     "./dist",
     "./**/dist",
-    "./**/**/dist"
+    "./**/**/dist",
+    "./citrineos-core/**/*"
   ],
   "compilerOptions": {
     "target": "es6",

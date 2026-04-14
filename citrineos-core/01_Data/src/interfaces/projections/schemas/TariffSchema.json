@@ -1,0 +1,33 @@
+{
+  "$id": "TariffSchema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "pricePerKwh": {
+      "type": "number"
+    },
+    "pricePerMin": {
+      "type": "number"
+    },
+    "pricePerSession": {
+      "type": "number"
+    },
+    "paymentFee": {
+      "type": "number"
+    },
+    "authorizationAmount": {
+      "type": "number"
+    },
+    "taxRate": {
+      "type": "number"
+    }
+  },
+  "required": ["currency", "pricePerKwh"]
+}
