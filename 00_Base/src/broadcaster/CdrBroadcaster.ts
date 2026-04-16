@@ -2,16 +2,22 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { BaseBroadcaster } from './BaseBroadcaster';
-import { Service } from 'typedi';
-import { CdrsClientApi } from '../trigger/CdrsClientApi';
-import { ILogObj, Logger } from 'tslog';
-import { Cdr } from '../model/Cdr';
-import { ModuleId } from '../model/ModuleId';
-import { InterfaceRole } from '../model/InterfaceRole';
 import { HttpMethod, ITransactionDto } from '@citrineos/base';
+import { ILogObj, Logger } from 'tslog';
+import { Service } from 'typedi';
+import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
+import {
+  InsertCdrRecordMutationResult,
+  InsertCdrRecordMutationVariables,
+} from '../graphql/operations';
+import { INSERT_CDR_RECORD_MUTATION } from '../graphql/queries/cdr.queries';
 import { CdrMapper } from '../mapper';
+import { Cdr } from '../model/Cdr';
+import { InterfaceRole } from '../model/InterfaceRole';
+import { ModuleId } from '../model/ModuleId';
 import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
+import { CdrsClientApi } from '../trigger/CdrsClientApi';
+import { BaseBroadcaster } from './BaseBroadcaster';
 
 @Service()
 export class CdrBroadcaster extends BaseBroadcaster {
@@ -19,6 +25,7 @@ export class CdrBroadcaster extends BaseBroadcaster {
     readonly logger: Logger<ILogObj>,
     readonly cdrMapper: CdrMapper,
     readonly cdrsClientApi: CdrsClientApi,
+    readonly ocpiGraphqlClient: OcpiGraphqlClient,
   ) {
     super();
   }
@@ -47,6 +54,56 @@ export class CdrBroadcaster extends BaseBroadcaster {
       });
     } catch (e) {
       this.logger.error(`broadcastPostCdr failed for CDR ${cdrDto.id}`, e);
+    }
+
+    await this.persistCdrRecord(cdrDto, transactionDto);
+  }
+
+  private async persistCdrRecord(
+    cdr: Cdr,
+    transaction: ITransactionDto,
+  ): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+      const tenantPartnerId =
+        transaction.authorization?.tenantPartner?.id ?? undefined;
+
+      const variables: InsertCdrRecordMutationVariables = {
+        cdrId: cdr.id,
+        transactionId: transaction.id ?? undefined,
+        tenantPartnerId,
+        ocpiSessionId: cdr.session_id ?? undefined,
+        startDateTime: cdr.start_date_time,
+        endDateTime: cdr.end_date_time,
+        currency: cdr.currency,
+        totalEnergy: cdr.total_energy,
+        totalTime: cdr.total_time,
+        totalParkingTime: cdr.total_parking_time ?? 0,
+        totalCostExclVat: cdr.total_cost.excl_vat,
+        totalCostInclVat: cdr.total_cost.incl_vat ?? undefined,
+        totalEnergyCostExclVat: cdr.total_energy_cost?.excl_vat ?? undefined,
+        totalTimeCostExclVat: cdr.total_time_cost?.excl_vat ?? undefined,
+        totalParkingCostExclVat: cdr.total_parking_cost?.excl_vat ?? undefined,
+        totalFixedCostExclVat: cdr.total_fixed_cost?.excl_vat ?? undefined,
+        totalReservationCostExclVat:
+          cdr.total_reservation_cost?.excl_vat ?? undefined,
+        taxRate: undefined,
+        cdrData: cdr as any,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await this.ocpiGraphqlClient.request<
+        InsertCdrRecordMutationResult,
+        InsertCdrRecordMutationVariables
+      >(INSERT_CDR_RECORD_MUTATION, variables);
+
+      this.logger.debug(`Persisted CdrRecord for CDR ${cdr.id}`);
+    } catch (e) {
+      this.logger.error(
+        `Failed to persist CdrRecord for CDR ${cdr.id} — broadcast was still attempted`,
+        e,
+      );
     }
   }
 }
