@@ -8,6 +8,13 @@ object_relationships:
   - name: Evse
     using:
       foreign_key_constraint_on: evseId
+  - name: Tariff
+    using:
+      foreign_key_constraint_on:
+        column: connectorId
+        table:
+          name: Tariffs
+          schema: public
   - name: Tenant
     using:
       foreign_key_constraint_on: tenantId

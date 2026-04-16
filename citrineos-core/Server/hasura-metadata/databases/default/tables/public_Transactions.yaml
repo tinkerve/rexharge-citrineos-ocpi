@@ -5,6 +5,13 @@ object_relationships:
   - name: Authorization
     using:
       foreign_key_constraint_on: authorizationId
+  - name: CdrRecord
+    using:
+      foreign_key_constraint_on:
+        column: transactionId
+        table:
+          name: CdrRecords
+          schema: public
   - name: ChargingStation
     using:
       foreign_key_constraint_on: stationId

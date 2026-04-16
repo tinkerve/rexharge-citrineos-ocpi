@@ -1,3 +1,10 @@
 table:
   name: TenantPartnerLocations
   schema: public
+object_relationships:
+  - name: Location
+    using:
+      foreign_key_constraint_on: locationId
+  - name: TenantPartner
+    using:
+      foreign_key_constraint_on: tenantPartnerId

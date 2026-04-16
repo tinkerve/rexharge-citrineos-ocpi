@@ -13,6 +13,13 @@ array_relationships:
         table:
           name: ChargingStations
           schema: public
+  - name: TenantPartnerLocations
+    using:
+      foreign_key_constraint_on:
+        column: locationId
+        table:
+          name: TenantPartnerLocations
+          schema: public
   - name: Transactions
     using:
       foreign_key_constraint_on:
