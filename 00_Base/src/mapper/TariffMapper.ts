@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { ITariffDto } from '@citrineos/base';
 import { TariffDTO } from '../model/DTO/tariffs/TariffDTO';
 import { TariffDimensionType } from '../model/TariffDimensionType';
 import { TariffElement } from '../model/TariffElement';
 import { TariffType } from '../model/TariffType';
 import { MINUTES_IN_HOUR } from '../util/Consts';
-import { ITariffDto } from '@citrineos/base';
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 
 export class TariffMapper {
@@ -19,7 +19,7 @@ export class TariffMapper {
       country_code: coreTariff.tenant!.countryCode!,
       party_id: coreTariff.tenant!.partyId!,
       currency: coreTariff.currency!,
-      type: TariffType.AD_HOC_PAYMENT,
+      type: TariffType.REGULAR,
       // tariff_alt_text: coreTariff.tariffAltText
       //   ? (coreTariff.tariffAltText[0] as any)?.text
       //   : undefined,

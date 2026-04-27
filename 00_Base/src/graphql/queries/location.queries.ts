@@ -5,11 +5,7 @@
 import { gql } from 'graphql-request';
 
 export const GET_LOCATIONS_QUERY = gql`
-  query GetLocations(
-    $limit: Int
-    $offset: Int
-    $where: Locations_bool_exp!
-  ) {
+  query GetLocations($limit: Int, $offset: Int, $where: Locations_bool_exp!) {
     Locations(
       offset: $offset
       limit: $limit
@@ -167,7 +163,7 @@ export const GET_LOCATION_BY_ID_QUERY = gql`
             vendorErrorCode
             createdAt
             updatedAt
-            Tariffs {
+            tariffs: Tariffs {
               id
             }
           }
