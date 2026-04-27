@@ -34,6 +34,7 @@ export type Authorizations_Set_Input = {
 export type Locations_Bool_Exp = {
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
   Tenant?: InputMaybe<Tenants_Bool_Exp>;
+  TenantPartnerLocations?: InputMaybe<TenantPartnerLocations_Bool_Exp>;
 };
 export type Tariffs_Bool_Exp = {
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
@@ -61,6 +62,12 @@ export type TenantPartners_Bool_Exp = {
 };
 export type String_Comparison_Exp = {
   _eq?: InputMaybe<Scalars['String']['input']>;
+};
+export type Int_Comparison_Exp = {
+  _eq?: InputMaybe<Scalars['Int']['input']>;
+};
+export type TenantPartnerLocations_Bool_Exp = {
+  tenantPartnerId?: InputMaybe<Int_Comparison_Exp>;
 };
 export type InsertCdrRecordMutationVariables = Exact<{
   cdrId: Scalars['String']['input'];
