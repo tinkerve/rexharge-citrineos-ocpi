@@ -2,21 +2,20 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { BaseBroadcaster } from './BaseBroadcaster';
-import { Service } from 'typedi';
-import { SessionsClientApi } from '../trigger/SessionsClientApi';
-import { ILogObj, Logger } from 'tslog';
-import { Session } from '../model/Session';
-import { ModuleId } from '../model/ModuleId';
-import { InterfaceRole } from '../model/InterfaceRole';
 import {
   HttpMethod,
   IMeterValueDto,
   ITenantDto,
+  ITenantPartnerDto,
   ITransactionDto,
 } from '@citrineos/base';
+import { ILogObj, Logger } from 'tslog';
+import { Service } from 'typedi';
 import { SessionMapper } from '../mapper/SessionMapper';
 import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
+import { Session } from '../model/Session';
+import { SessionsClientApi } from '../trigger/SessionsClientApi';
+import { BaseBroadcaster } from './BaseBroadcaster';
 
 @Service()
 export class SessionBroadcaster extends BaseBroadcaster {
@@ -35,7 +34,15 @@ export class SessionBroadcaster extends BaseBroadcaster {
     const session =
       await this.sessionMapper.mapTransactionToSession(transactionDto);
     const path = `/${tenant.countryCode}/${tenant.partyId}/${session.id}`;
-    await this.broadcastSession(tenant, session, HttpMethod.Put, path);
+    const tenantPartner =
+      transactionDto.authorization?.tenantPartner ?? undefined;
+    await this.broadcastSession(
+      tenant,
+      session,
+      HttpMethod.Put,
+      path,
+      tenantPartner,
+    );
   }
 
   async broadcastPatchSession(
@@ -47,7 +54,15 @@ export class SessionBroadcaster extends BaseBroadcaster {
         transactionDto,
       );
     const path = `/${tenant.countryCode}/${tenant.partyId}/${session.id}`;
-    await this.broadcastSession(tenant, session, HttpMethod.Patch, path);
+    const tenantPartner =
+      transactionDto.authorization?.tenantPartner ?? undefined;
+    await this.broadcastSession(
+      tenant,
+      session,
+      HttpMethod.Patch,
+      path,
+      tenantPartner,
+    );
   }
 
   async broadcastPatchSessionChargingPeriod(
@@ -72,18 +87,30 @@ export class SessionBroadcaster extends BaseBroadcaster {
     session: Partial<Session>,
     method: HttpMethod,
     path: string,
+    tenantPartner?: ITenantPartnerDto,
   ): Promise<void> {
     try {
-      await this.sessionsClientApi.broadcastToClients({
-        cpoCountryCode: tenant.countryCode!,
-        cpoPartyId: tenant.partyId!,
-        moduleId: ModuleId.Sessions,
-        interfaceRole: InterfaceRole.RECEIVER,
-        httpMethod: method,
-        schema: OcpiEmptyResponseSchema,
-        body: session,
-        path: path,
-      });
+      if (tenantPartner) {
+        // Session was authorized by a specific EMSP partner — only push to them
+        this.logger.debug(
+          `Session ${path} authorized by partner ${tenantPartner.countryCode}_${tenantPartner.partyId}, targeting them only`,
+        );
+        await this.sessionsClientApi.request(
+          tenant.countryCode!,
+          tenant.partyId!,
+          tenantPartner.countryCode!,
+          tenantPartner.partyId!,
+          method,
+          OcpiEmptyResponseSchema,
+          tenantPartner.partnerProfileOCPI!,
+          true,
+          undefined,
+          session,
+          undefined,
+          undefined,
+          path,
+        );
+      }
     } catch (e) {
       this.logger.error(`broadcast${method}Session failed for ${path}`, e);
     }

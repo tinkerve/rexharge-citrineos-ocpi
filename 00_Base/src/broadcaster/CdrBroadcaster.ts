@@ -13,8 +13,6 @@ import {
 import { INSERT_CDR_RECORD_MUTATION } from '../graphql/queries/cdr.queries';
 import { CdrMapper } from '../mapper';
 import { Cdr } from '../model/Cdr';
-import { InterfaceRole } from '../model/InterfaceRole';
-import { ModuleId } from '../model/ModuleId';
 import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
 import { CdrsClientApi } from '../trigger/CdrsClientApi';
 import { BaseBroadcaster } from './BaseBroadcaster';
@@ -41,17 +39,28 @@ export class CdrBroadcaster extends BaseBroadcaster {
       return;
     }
     const cdrDto = cdrs[0];
+    const tenantPartner =
+      transactionDto.authorization?.tenantPartner ?? undefined;
 
     try {
-      await this.cdrsClientApi.broadcastToClients({
-        cpoCountryCode: cdrDto.country_code!,
-        cpoPartyId: cdrDto.party_id!,
-        moduleId: ModuleId.Cdrs,
-        interfaceRole: InterfaceRole.RECEIVER,
-        httpMethod: HttpMethod.Post,
-        schema: OcpiEmptyResponseSchema,
-        body: cdrDto,
-      });
+      if (tenantPartner) {
+        // CDR is the bill for this session — only send to the authorizing EMSP
+        this.logger.debug(
+          `CDR ${cdrDto.id} authorized by partner ${tenantPartner.countryCode}_${tenantPartner.partyId}, targeting them only`,
+        );
+        await this.cdrsClientApi.request(
+          cdrDto.country_code!,
+          cdrDto.party_id!,
+          tenantPartner.countryCode!,
+          tenantPartner.partyId!,
+          HttpMethod.Post,
+          OcpiEmptyResponseSchema,
+          tenantPartner.partnerProfileOCPI!,
+          true,
+          undefined,
+          cdrDto,
+        );
+      }
     } catch (e) {
       this.logger.error(`broadcastPostCdr failed for CDR ${cdrDto.id}`, e);
     }
