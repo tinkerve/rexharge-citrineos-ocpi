@@ -68,6 +68,7 @@ export class SessionBroadcaster extends BaseBroadcaster {
   async broadcastPatchSessionChargingPeriod(
     tenant: ITenantDto,
     meterValueDto: IMeterValueDto,
+    tenantPartner?: ITenantPartnerDto,
   ): Promise<void> {
     const charging_periods = await this.sessionMapper.getChargingPeriods(
       [meterValueDto],
@@ -79,6 +80,7 @@ export class SessionBroadcaster extends BaseBroadcaster {
       { charging_periods },
       HttpMethod.Patch,
       path,
+      tenantPartner,
     );
   }
 

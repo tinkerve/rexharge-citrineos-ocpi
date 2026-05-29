@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { ICache, IMeterValueDto, ITransactionDto } from '@citrineos/base';
+import { ICache, IConnectorDto, IMeterValueDto, ITransactionDto } from '@citrineos/base';
 import {
   AbstractDtoModule,
   AsDtoEventHandler,
@@ -10,7 +10,10 @@ import {
   CdrBroadcaster,
   DtoEventObjectType,
   DtoEventType,
+  GET_RECENTLY_ENDED_TRANSACTION_BY_EVSE_QUERY,
   GET_TRANSACTION_BY_ID_QUERY,
+  GetRecentlyEndedTransactionByEvseQueryResult,
+  GetRecentlyEndedTransactionByEvseQueryVariables,
   GetTransactionByTransactionIdQueryResult,
   GetTransactionByTransactionIdQueryVariables,
   IDtoEvent,
@@ -61,6 +64,51 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
   async shutdown(): Promise<void> {
     this._logger.info('Shutting down Sessions Module...');
     await super.shutdown();
+  }
+
+  /**
+   * CDR is ready when the session has ended AND we have a confirmed unplug timestamp.
+   *
+   * For OCPP 2.0.1 sessions ended by EVDisconnected (stoppedReason=EVDisconnected),
+   * endTime IS the unplug timestamp — CDR can be sent immediately.
+   *
+   * For sessions ended by a stop command (Remote, Local, StopAuthorized, etc.),
+   * the car may still be physically connected. We wait until the connector returns
+   * to Available (StatusNotification → handleConnectorUpdate), which stores
+   * unplugTime in customData. Only then is the CDR ready.
+   */
+  private isReadyForCdrBroadcast(transaction: ITransactionDto): boolean {
+    if (transaction.isActive !== false) {
+      return false;
+    }
+
+    if (!transaction.endTime) {
+      return false;
+    }
+
+    // OCPP 1.6 path: stopTransaction is populated; endTime is set together with it
+    const stopTimeMs = this.toMs(transaction.stopTransaction?.timestamp);
+    if (stopTimeMs != null) {
+      return this.toMs(transaction.endTime)! >= stopTimeMs;
+    }
+
+    // OCPP 2.0.1: if session ended because EV physically disconnected,
+    // endTime is already the unplug time — no further waiting needed.
+    if (transaction.stoppedReason === 'EVDisconnected') {
+      return true;
+    }
+
+    // Session was stopped by a command; wait for connector → Available
+    // (handleConnectorUpdate sets customData.unplugTime when that happens).
+    return transaction.customData?.unplugTime != null;
+  }
+
+  private toMs(value: string | null | undefined): number | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const ms = new Date(value).getTime();
+    return Number.isNaN(ms) ? undefined : ms;
   }
 
   /**
@@ -202,8 +250,17 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       return;
     }
     await this.sessionBroadcaster.broadcastPatchSession(tenant, transactionDto);
-    if (transactionDto.isActive === false) {
-      this._logger.debug(`Transaction is no longer active: ${event._eventId}`);
+
+    // Check CDR readiness when session ends (isActive→false) OR when unplug timestamp
+    // arrives (endTime set) — the latter covers the "stop first, unplug later" case where
+    // isActive is already false in the DB but endTime was not yet present at stop time.
+    const shouldCheckCdr =
+      transactionDto.isActive === false || transactionDto.endTime != null;
+
+    if (shouldCheckCdr) {
+      this._logger.debug(
+        `CDR readiness check for transaction ${transactionDto.id} (isActive=${transactionDto.isActive}, endTime=${transactionDto.endTime})`,
+      );
 
       const fullTransactionDtoResponse = await this.ocpiGraphqlClient.request<
         GetTransactionByTransactionIdQueryResult,
@@ -221,6 +278,14 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
 
       const fullTransactionDto = fullTransactionDtoResponse
         .Transactions[0] as ITransactionDto;
+
+      if (!this.isReadyForCdrBroadcast(fullTransactionDto)) {
+        this._logger.debug(
+          `Transaction ${fullTransactionDto.id} not ready for CDR yet (waiting for session end and/or unplug).`,
+        );
+        return;
+      }
+
       await this.cdrBroadcaster.broadcastPostCdr(fullTransactionDto);
     }
   }
@@ -263,10 +328,121 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         return;
       }
 
+      const fullTransactionDtoResponse = await this.ocpiGraphqlClient.request<
+        GetTransactionByTransactionIdQueryResult,
+        GetTransactionByTransactionIdQueryVariables
+      >(GET_TRANSACTION_BY_ID_QUERY, {
+        id: Number(meterValueDto.transactionId),
+      });
+      const fullTransactionDto = fullTransactionDtoResponse.Transactions[0] as
+        | ITransactionDto
+        | undefined;
+      const tenantPartner =
+        fullTransactionDto?.authorization?.tenantPartner ?? undefined;
+
       await this.sessionBroadcaster.broadcastPatchSessionChargingPeriod(
         tenant,
         meterValueDto,
+        tenantPartner,
       );
     }
+  }
+
+  /**
+   * When a connector returns to Available, the car has physically unplugged.
+   * For sessions stopped by a command (not EVDisconnected), this is the unplug
+   * timestamp we were waiting for. We record it in customData and fire the CDR.
+   */
+  @AsDtoEventHandler(
+    DtoEventType.UPDATE,
+    DtoEventObjectType.Connector,
+    'ConnectorNotification',
+  )
+  async handleConnectorUpdate(
+    event: IDtoEvent<Partial<IConnectorDto>>,
+  ): Promise<void> {
+    const connectorDto = event._payload;
+
+    // Only act on transitions to Available (= physical unplug)
+    if (connectorDto.status !== 'Available') {
+      return;
+    }
+
+    if (!connectorDto.evseId || !connectorDto.stationId) {
+      return;
+    }
+
+    // Find the most recently ended transaction on this EVSE
+    const response = await this.ocpiGraphqlClient.request<
+      GetRecentlyEndedTransactionByEvseQueryResult,
+      GetRecentlyEndedTransactionByEvseQueryVariables
+    >(GET_RECENTLY_ENDED_TRANSACTION_BY_EVSE_QUERY, {
+      evseId: connectorDto.evseId,
+      stationId: connectorDto.stationId,
+    });
+
+    const rawTransaction = response.Transactions[0];
+    if (!rawTransaction) {
+      return;
+    }
+
+    // Skip if already ended by EVDisconnected — CDR was already sent at Ended time
+    if (rawTransaction.stoppedReason === 'EVDisconnected') {
+      return;
+    }
+
+    // Skip if unplugTime is already recorded (idempotency guard)
+    if (rawTransaction.customData?.unplugTime != null) {
+      return;
+    }
+
+    // The StatusNotification timestamp on the connector is the charger-clock unplug time.
+    // Fall back to updatedAt if timestamp is not present.
+    const unplugTime = connectorDto.timestamp ?? connectorDto.updatedAt?.toISOString();
+    if (!unplugTime) {
+      this._logger.warn(
+        `Connector ${connectorDto.id} has no timestamp for unplug event on EVSE ${connectorDto.evseId}`,
+      );
+      return;
+    }
+
+    // Sanity check: unplug must be after or at session end
+    const endTimeMs = this.toMs(rawTransaction.endTime);
+    const unplugMs = this.toMs(unplugTime);
+    if (endTimeMs == null || unplugMs == null || unplugMs < endTimeMs) {
+      this._logger.debug(
+        `Connector Available timestamp (${unplugTime}) is not after session endTime (${rawTransaction.endTime}) for transaction ${rawTransaction.id}, skipping unplug recording`,
+      );
+      return;
+    }
+
+    // Store unplugTime so CdrMapper can compute post-session parking
+    const customData = { ...(rawTransaction.customData ?? {}), unplugTime };
+    await this.ocpiGraphqlClient.request<
+      UpdateTransactionCustomDataMutationResult,
+      UpdateTransactionCustomDataMutationVariables
+    >(UPDATE_TRANSACTION_CUSTOM_DATA_MUTATION, {
+      id: rawTransaction.id,
+      customData,
+    });
+
+    // Re-fetch the full transaction (now with unplugTime in customData) and broadcast CDR
+    const fullTransactionResponse = await this.ocpiGraphqlClient.request<
+      GetTransactionByTransactionIdQueryResult,
+      GetTransactionByTransactionIdQueryVariables
+    >(GET_TRANSACTION_BY_ID_QUERY, { id: rawTransaction.id });
+
+    const fullTransaction = fullTransactionResponse.Transactions[0] as ITransactionDto | undefined;
+    if (!fullTransaction) {
+      this._logger.error(`Transaction ${rawTransaction.id} not found after unplug update`);
+      return;
+    }
+
+    if (!this.isReadyForCdrBroadcast(fullTransaction)) {
+      this._logger.debug(`Transaction ${fullTransaction.id} still not ready for CDR after unplug`);
+      return;
+    }
+
+    await this.cdrBroadcaster.broadcastPostCdr(fullTransaction);
   }
 }

@@ -12,4 +12,5 @@ export * from './tenant.mutations';
 export * from './tenantPartner.queries';
 export * from './tenantVersionEndpoints.queries';
 export * from './token.queries';
+export * from './statusNotification.queries';
 export * from './transaction.queries';

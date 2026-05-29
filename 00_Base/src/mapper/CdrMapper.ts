@@ -5,6 +5,11 @@
 import { ITariffDto, ITransactionDto } from '@citrineos/base';
 import { ILogObj, Logger } from 'tslog';
 import { Service } from 'typedi';
+import {
+  GetStatusNotificationsInRangeQueryResult,
+  GetStatusNotificationsInRangeQueryVariables,
+} from '../graphql/operations';
+import { GET_STATUS_NOTIFICATIONS_IN_RANGE } from '../graphql/queries';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import { Cdr } from '../model/Cdr';
 import { CdrDimensionType } from '../model/CdrDimensionType';
@@ -36,6 +41,11 @@ export class CdrMapper extends BaseTransactionMapper {
   ): Promise<Cdr[]> {
     try {
       const validTransactions = this.getCompletedTransactions(transactions);
+      const transactionIdToTransactionMap = new Map<string, ITransactionDto>(
+        validTransactions
+          .filter((transaction) => transaction.id !== undefined)
+          .map((transaction) => [transaction.id!.toString(), transaction]),
+      );
 
       const sessions = await this.mapTransactionsToSessions(validTransactions);
 
@@ -51,6 +61,7 @@ export class CdrMapper extends BaseTransactionMapper {
         );
       return await this.mapSessionsToCDRs(
         sessions,
+        transactionIdToTransactionMap,
         transactionIdToLocationMap,
         transactionIdToTariffMap,
         transactionIdToOcpiTariffMap,
@@ -74,6 +85,7 @@ export class CdrMapper extends BaseTransactionMapper {
 
   private async mapSessionsToCDRs(
     sessions: Session[],
+    transactionIdToTransactionMap: Map<string, ITransactionDto>,
     transactionIdToLocationMap: Map<string, LocationDTO>,
     transactionIdToTariffMap: Map<string, ITariffDto>,
     transactionIdToOcpiTariffMap: Map<string, OcpiTariff>,
@@ -84,6 +96,7 @@ export class CdrMapper extends BaseTransactionMapper {
         .map((session) =>
           this.mapSessionToCDR(
             session,
+            transactionIdToTransactionMap.get(session.id),
             transactionIdToLocationMap.get(session.id)!,
             transactionIdToTariffMap.get(session.id)!,
             transactionIdToOcpiTariffMap.get(session.id)!,
@@ -94,13 +107,17 @@ export class CdrMapper extends BaseTransactionMapper {
 
   private async mapSessionToCDR(
     session: Session,
+    transaction: ITransactionDto | undefined,
     location: LocationDTO,
     tariff: ITariffDto,
     ocpiTariff: OcpiTariff,
   ): Promise<Cdr> {
     const totalEnergy = session.kwh;
     const totalTime = this.calculateTotalTime(session);
-    const totalParkingTime = this.calculateTotalParkingTimeFromPeriods(session);
+    const totalParkingTime = await this.calculateTotalParkingTime(
+      session,
+      transaction,
+    );
 
     const totalEnergyCost = this.computeEnergyCost(totalEnergy, tariff);
     const totalTimeCost = this.computeTimeCost(totalTime, tariff);
@@ -142,6 +159,24 @@ export class CdrMapper extends BaseTransactionMapper {
       credit_reference_id: this.generateCreditReferenceId(session, tariff),
       last_updated: toISOStringIfNeeded(session.last_updated, true),
     };
+  }
+
+  /**
+   * Total parking time = explicit PARKING_TIME from charging periods (currently always 0)
+   * + time spent in idle statuses derived from StatusNotifications (see calculateNonChargingHours).
+   */
+  private async calculateTotalParkingTime(
+    session: Session,
+    transaction?: ITransactionDto,
+  ): Promise<number> {
+    const explicitParkingHours = this.calculateTotalParkingTimeFromPeriods(session);
+    const nonChargingHours = await this.calculateNonChargingHours(
+      session,
+      transaction,
+      explicitParkingHours,
+    );
+
+    return this.round4(explicitParkingHours + nonChargingHours);
   }
 
   private generateCdrId(session: Session): string {
@@ -269,6 +304,111 @@ export class CdrMapper extends BaseTransactionMapper {
       }
     }
     return totalHours;
+  }
+
+  /**
+   * Query StatusNotifications for the EVSE during the session window and sum time spent
+   * in idle statuses (SuspendedEVSE, SuspendedEV, Finishing). The window extends from
+   * session start to unplugTime (if recorded) or endTime, capturing both in-session
+   * pausing and post-session parking in one pass.
+   *
+   * OCPP evseId is taken from the first TransactionEvent's EvseType.id, which holds the
+   * raw OCPP integer used in StatusNotification — not the DB FK on the Transaction row.
+   */
+  private async calculateNonChargingHours(
+    session: Session,
+    transaction: ITransactionDto | undefined,
+    explicitParkingHours: number,
+  ): Promise<number> {
+    if (explicitParkingHours > 0 || !transaction) {
+      return 0;
+    }
+
+    const stationId = transaction.stationId;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ocppEvseId: number | null | undefined = (transaction.transactionEvents?.[0] as any)?.EvseType?.id;
+
+    // OCPP 1.6 path: evseId is absent from StatusNotifications; fall back to
+    // timeSpentCharging subtraction, which covers in-session idle only
+    // (no post-session parking in 1.6 — session ends at StopTransaction).
+    if (!stationId || ocppEvseId == null) {
+      return this.calculateNonChargingHoursFromTimeSpentCharging(session, transaction);
+    }
+
+    const windowStart = session.start_date_time;
+    const windowEnd =
+      transaction.customData?.unplugTime ??
+      transaction.endTime ??
+      session.end_date_time;
+
+    if (!windowStart || !windowEnd) {
+      return 0;
+    }
+
+    try {
+      const response = await this.ocpiGraphqlClient.request<
+        GetStatusNotificationsInRangeQueryResult,
+        GetStatusNotificationsInRangeQueryVariables
+      >(GET_STATUS_NOTIFICATIONS_IN_RANGE, {
+        stationId,
+        evseId: ocppEvseId,
+        start: windowStart,
+        end: windowEnd,
+      });
+
+      return this.sumIdleTimeFromNotifications(response.StatusNotifications, windowEnd);
+    } catch (error) {
+      this.logger.warn('Failed to fetch StatusNotifications for idle time calculation, defaulting to 0', { error });
+      return 0;
+    }
+  }
+
+  private sumIdleTimeFromNotifications(
+    notifications: Array<{ timestamp?: string | null; connectorStatus?: string | null }>,
+    windowEnd: string,
+  ): number {
+    const IDLE_STATUSES = new Set(['SuspendedEVSE', 'SuspendedEV', 'Finishing']);
+    let idleMs = 0;
+
+    for (let i = 0; i < notifications.length; i++) {
+      const status = notifications[i].connectorStatus;
+      if (!status || !IDLE_STATUSES.has(status)) continue;
+
+      const idleStartMs = this.toMs(notifications[i].timestamp);
+      if (idleStartMs == null) continue;
+
+      const idleEndMs =
+        i + 1 < notifications.length
+          ? (this.toMs(notifications[i + 1].timestamp) ?? this.toMs(windowEnd))
+          : this.toMs(windowEnd);
+
+      if (idleEndMs == null) continue;
+      idleMs += Math.max(idleEndMs - idleStartMs, 0);
+    }
+
+    return this.round4(idleMs / 3600000);
+  }
+
+  private calculateNonChargingHoursFromTimeSpentCharging(
+    session: Session,
+    transaction: ITransactionDto,
+  ): number {
+    if (transaction.timeSpentCharging == null) return 0;
+    const sessionStartMs = this.toMs(session.start_date_time);
+    const sessionEndMs = this.toMs(transaction.endTime ?? session.end_date_time);
+    const chargingSeconds = Number(transaction.timeSpentCharging);
+    if (sessionStartMs == null || sessionEndMs == null || !Number.isFinite(chargingSeconds)) return 0;
+    const totalConnectedHours = Math.max(sessionEndMs - sessionStartMs, 0) / 3600000;
+    const chargingHours = Math.max(chargingSeconds, 0) / 3600;
+    return this.round4(Math.max(totalConnectedHours - chargingHours, 0));
+  }
+
+  private toMs(value: string | null | undefined): number | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const ms = new Date(value).getTime();
+    return Number.isNaN(ms) ? undefined : ms;
   }
 
   /**

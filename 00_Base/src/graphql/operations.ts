@@ -896,6 +896,78 @@ export type UpdateTransactionCustomDataMutationResult = {
   } | null;
 };
 
+export type GetRecentlyEndedTransactionByEvseQueryVariables = Exact<{
+  evseId: Scalars['Int']['input'];
+  stationId: Scalars['String']['input'];
+}>;
+
+export type GetRecentlyEndedTransactionByEvseQueryResult = {
+  Transactions: Array<{
+    id: number;
+    stationId?: string | null;
+    transactionId?: string | null;
+    isActive?: boolean | null;
+    chargingState?: string | null;
+    timeSpentCharging?: any | null;
+    totalKwh?: any | null;
+    stoppedReason?: string | null;
+    remoteStartId?: number | null;
+    totalCost?: any | null;
+    startTime?: any | null;
+    endTime?: any | null;
+    createdAt: any;
+    updatedAt: any;
+    evseId?: number | null;
+    connectorId?: number | null;
+    locationId?: number | null;
+    authorizationId?: number | null;
+    tariffId?: number | null;
+    customData?: any | null;
+    tenant: {
+      countryCode: string;
+      partyId: string;
+    };
+    authorization?: {
+      idToken: string;
+      additionalInfo?: any | null;
+      tenantPartner?: {
+        id: number;
+        countryCode: string;
+        partyId: string;
+        partnerProfileOCPI?: any | null;
+        tenant: {
+          id: number;
+          countryCode: string;
+          partyId: string;
+        };
+      } | null;
+    } | null;
+    chargingStation?: {
+      id: string;
+      isOnline?: boolean | null;
+      protocol?: string | null;
+    } | null;
+    transactionEvents: Array<{
+      id: number;
+      eventType?: string | null;
+      transactionInfo?: any | null;
+      EvseType?: {
+        id?: number | null;
+      } | null;
+    }>;
+    startTransaction?: {
+      timestamp?: any | null;
+    } | null;
+    stopTransaction?: {
+      timestamp?: any | null;
+    } | null;
+    meterValues: Array<{
+      timestamp?: any | null;
+      sampledValue?: any | null;
+    }>;
+  }>;
+};
+
 export type GetTransactionByTransactionIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
@@ -964,5 +1036,19 @@ export type GetTransactionByTransactionIdQueryResult = {
       timestamp?: any | null;
       sampledValue?: any | null;
     }>;
+  }>;
+};
+
+export type GetStatusNotificationsInRangeQueryVariables = Exact<{
+  stationId: Scalars['String']['input'];
+  evseId: Scalars['Int']['input'];
+  start: Scalars['timestamptz']['input'];
+  end: Scalars['timestamptz']['input'];
+}>;
+
+export type GetStatusNotificationsInRangeQueryResult = {
+  StatusNotifications: Array<{
+    timestamp?: string | null;
+    connectorStatus?: string | null;
   }>;
 };

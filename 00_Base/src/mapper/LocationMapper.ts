@@ -288,15 +288,21 @@ export class EvseMapper {
       return EvseStatus.UNKNOWN;
     }
 
-    const anyInUse = connectors.some(
+    const anyCharging = connectors.some(
+      (c) => c.status === ConnectorStatus.Charging,
+    );
+    if (anyCharging) {
+      return EvseStatus.CHARGING;
+    }
+    // EV connected but not actively charging — paused mid-session or stopped but not yet unplugged
+    const anyBlocked = connectors.some(
       (c) =>
-        c.status === ConnectorStatus.Charging ||
         c.status === ConnectorStatus.SuspendedEVSE ||
         c.status === ConnectorStatus.SuspendedEV ||
         c.status === ConnectorStatus.Finishing,
     );
-    if (anyInUse) {
-      return EvseStatus.CHARGING;
+    if (anyBlocked) {
+      return EvseStatus.BLOCKED;
     }
     const anyReserved = connectors.some(
       (c) => c.status === ConnectorStatus.Reserved,
