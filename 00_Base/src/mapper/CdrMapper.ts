@@ -328,8 +328,11 @@ export class CdrMapper extends BaseTransactionMapper {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ocppEvseId: number | null | undefined = (transaction.transactionEvents?.[0] as any)?.EvseType?.id;
 
+    // OCPP 1.6 path: evseId is absent from StatusNotifications; fall back to
+    // timeSpentCharging subtraction, which covers in-session idle only
+    // (no post-session parking in 1.6 — session ends at StopTransaction).
     if (!stationId || ocppEvseId == null) {
-      return 0;
+      return this.calculateNonChargingHoursFromTimeSpentCharging(session, transaction);
     }
 
     const windowStart = session.start_date_time;
@@ -384,6 +387,20 @@ export class CdrMapper extends BaseTransactionMapper {
     }
 
     return this.round4(idleMs / 3600000);
+  }
+
+  private calculateNonChargingHoursFromTimeSpentCharging(
+    session: Session,
+    transaction: ITransactionDto,
+  ): number {
+    if (transaction.timeSpentCharging == null) return 0;
+    const sessionStartMs = this.toMs(session.start_date_time);
+    const sessionEndMs = this.toMs(transaction.endTime ?? session.end_date_time);
+    const chargingSeconds = Number(transaction.timeSpentCharging);
+    if (sessionStartMs == null || sessionEndMs == null || !Number.isFinite(chargingSeconds)) return 0;
+    const totalConnectedHours = Math.max(sessionEndMs - sessionStartMs, 0) / 3600000;
+    const chargingHours = Math.max(chargingSeconds, 0) / 3600;
+    return this.round4(Math.max(totalConnectedHours - chargingHours, 0));
   }
 
   private toMs(value: string | null | undefined): number | undefined {
