@@ -212,6 +212,7 @@ export {
   ConnectorResponseSchemaName,
 } from './model/DTO/ConnectorDTO';
 export { LocationMapper } from './mapper/LocationMapper';
+export { EvseStatus } from './model/EvseStatus';
 export { TokensMapper } from './mapper/TokensMapper';
 export { SessionMapper } from './mapper/SessionMapper';
 export { AsOcpiFunctionalEndpoint } from './util/decorators/AsOcpiFunctionalEndpoint';

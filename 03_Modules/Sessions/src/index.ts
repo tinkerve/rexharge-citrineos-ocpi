@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { ICache, IConnectorDto, IMeterValueDto, ITransactionDto } from '@citrineos/base';
+import { ICache, IChargingStationDto, IConnectorDto, IMeterValueDto, ITransactionDto } from '@citrineos/base';
 import {
   AbstractDtoModule,
   AsDtoEventHandler,
@@ -11,6 +11,7 @@ import {
   DtoEventObjectType,
   DtoEventType,
   GET_RECENTLY_ENDED_TRANSACTION_BY_EVSE_QUERY,
+  LocationsBroadcaster,
   GET_TRANSACTION_BY_ID_QUERY,
   GetRecentlyEndedTransactionByEvseQueryResult,
   GetRecentlyEndedTransactionByEvseQueryVariables,
@@ -29,6 +30,7 @@ import {
   TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
 } from '@citrineos/ocpi-base';
 import { ILogObj, Logger } from 'tslog';
+import { EvseStatus } from '@citrineos/ocpi-base/src/model/EvseStatus';
 import { Inject, Service } from 'typedi';
 import { SessionsModuleApi } from './module/SessionsModuleApi';
 
@@ -45,6 +47,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
     readonly ocpiGraphqlClient: OcpiGraphqlClient,
     readonly sessionBroadcaster: SessionBroadcaster,
     readonly cdrBroadcaster: CdrBroadcaster,
+    readonly locationsBroadcaster: LocationsBroadcaster,
     @Inject() cacheWrapper: CacheWrapper,
   ) {
     super(config, new RabbitMqDtoReceiver(config, logger), logger);
@@ -77,6 +80,33 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
    * to Available (StatusNotification → handleConnectorUpdate), which stores
    * unplugTime in customData. Only then is the CDR ready.
    */
+  /**
+   * Broadcasts EVSE status AVAILABLE to all partners so they know the connector
+   * is physically free before the session COMPLETED PATCH and CDR arrive.
+   * Called inline (awaited) to guarantee ordering: AVAILABLE → session → CDR.
+   */
+  private async broadcastEvseAvailable(
+    transaction: Partial<ITransactionDto>,
+    timestamp: Date | string,
+  ): Promise<void> {
+    const { tenant, evseId, stationId, locationId } = transaction;
+    if (!tenant || evseId == null || !stationId || locationId == null) return;
+    try {
+      await this.locationsBroadcaster.broadcastPatchEvseStatus(
+        tenant,
+        {
+          id: evseId,
+          stationId,
+          chargingStation: { locationId } as IChargingStationDto,
+          updatedAt: new Date(timestamp),
+        },
+        EvseStatus.AVAILABLE,
+      );
+    } catch (e) {
+      this._logger.error('broadcastEvseAvailable failed', e);
+    }
+  }
+
   private isReadyForCdrBroadcast(transaction: ITransactionDto): boolean {
     if (transaction.isActive !== false) {
       return false;
@@ -86,20 +116,14 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       return false;
     }
 
-    // OCPP 1.6 path: stopTransaction is populated; endTime is set together with it
-    const stopTimeMs = this.toMs(transaction.stopTransaction?.timestamp);
-    if (stopTimeMs != null) {
-      return this.toMs(transaction.endTime)! >= stopTimeMs;
-    }
-
-    // OCPP 2.0.1: if session ended because EV physically disconnected,
-    // endTime is already the unplug time — no further waiting needed.
+    // Physical disconnect: endTime IS the unplug time — no further waiting needed.
+    // Applies to both OCPP 1.6 and 2.0.1 when the EV physically disconnected.
     if (transaction.stoppedReason === 'EVDisconnected') {
       return true;
     }
 
-    // Session was stopped by a command; wait for connector → Available
-    // (handleConnectorUpdate sets customData.unplugTime when that happens).
+    // All other stop reasons (Remote, Local, command, etc.) on both OCPP versions:
+    // wait for the connector to return to Available (handleConnectorUpdate sets unplugTime).
     return transaction.customData?.unplugTime != null;
   }
 
@@ -249,17 +273,14 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       );
       return;
     }
-    await this.sessionBroadcaster.broadcastPatchSession(tenant, transactionDto);
-
-    // Check CDR readiness when session ends (isActive→false) OR when unplug timestamp
-    // arrives (endTime set) — the latter covers the "stop first, unplug later" case where
-    // isActive is already false in the DB but endTime was not yet present at stop time.
-    const shouldCheckCdr =
+    // Determine if this event signals a session ending vs a normal in-session update
+    // (e.g., kwh update). Only session-end events require the full transaction.
+    const isSessionEndEvent =
       transactionDto.isActive === false || transactionDto.endTime != null;
 
-    if (shouldCheckCdr) {
+    if (isSessionEndEvent) {
       this._logger.debug(
-        `CDR readiness check for transaction ${transactionDto.id} (isActive=${transactionDto.isActive}, endTime=${transactionDto.endTime})`,
+        `Session-end event for transaction ${transactionDto.id} (isActive=${transactionDto.isActive}, endTime=${transactionDto.endTime})`,
       );
 
       const fullTransactionDtoResponse = await this.ocpiGraphqlClient.request<
@@ -279,14 +300,28 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       const fullTransactionDto = fullTransactionDtoResponse
         .Transactions[0] as ITransactionDto;
 
-      if (!this.isReadyForCdrBroadcast(fullTransactionDto)) {
-        this._logger.debug(
-          `Transaction ${fullTransactionDto.id} not ready for CDR yet (waiting for session end and/or unplug).`,
-        );
+      // Single authoritative PATCH using full data — avoids a preceding partial PATCH
+      // with potentially stale/incomplete status (e.g., ACTIVE when session just ended).
+      await this.sessionBroadcaster.broadcastPatchSession(tenant, fullTransactionDto);
+
+      // CDR is only sent here for EVDisconnected: endTime is the physical unplug time
+      // and no further wait is needed. All other stop reasons (command, Remote, Local,
+      // OCPP 1.6 remote/local) require a physical unplug signal and are handled
+      // exclusively by handleConnectorUpdate to avoid duplicate CDR.
+      if (
+        !this.isReadyForCdrBroadcast(fullTransactionDto) ||
+        fullTransactionDto.stoppedReason !== 'EVDisconnected'
+      ) {
         return;
       }
 
+      // Broadcast AVAILABLE before session/CDR so the partner knows the charger
+      // is physically free before the billing documents arrive.
+      await this.broadcastEvseAvailable(fullTransactionDto, fullTransactionDto.endTime!);
       await this.cdrBroadcaster.broadcastPostCdr(fullTransactionDto);
+    } else {
+      // Normal in-session update (kwh, charging periods, etc.) — partial DTO is sufficient.
+      await this.sessionBroadcaster.broadcastPatchSession(tenant, transactionDto);
     }
   }
 
@@ -386,7 +421,7 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       return;
     }
 
-    // Skip if already ended by EVDisconnected — CDR was already sent at Ended time
+    // Skip if already ended by EVDisconnected — CDR was already sent at that point
     if (rawTransaction.stoppedReason === 'EVDisconnected') {
       return;
     }
@@ -426,6 +461,10 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       customData,
     });
 
+    // Broadcast AVAILABLE to all partners now so they know the charger is physically
+    // free before the session COMPLETED PATCH and CDR arrive.
+    await this.broadcastEvseAvailable(rawTransaction as Partial<ITransactionDto>, unplugTime);
+
     // Re-fetch the full transaction (now with unplugTime in customData) and broadcast CDR
     const fullTransactionResponse = await this.ocpiGraphqlClient.request<
       GetTransactionByTransactionIdQueryResult,
@@ -441,6 +480,11 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
     if (!this.isReadyForCdrBroadcast(fullTransaction)) {
       this._logger.debug(`Transaction ${fullTransaction.id} still not ready for CDR after unplug`);
       return;
+    }
+
+    // Session is now COMPLETED — send final session update before the CDR
+    if (fullTransaction.tenant) {
+      await this.sessionBroadcaster.broadcastPatchSession(fullTransaction.tenant, fullTransaction);
     }
 
     await this.cdrBroadcaster.broadcastPostCdr(fullTransaction);

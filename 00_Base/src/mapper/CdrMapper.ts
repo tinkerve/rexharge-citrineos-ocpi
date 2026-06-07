@@ -308,9 +308,10 @@ export class CdrMapper extends BaseTransactionMapper {
 
   /**
    * Query StatusNotifications for the EVSE during the session window and sum time spent
-   * in idle statuses (SuspendedEVSE, SuspendedEV, Finishing). The window extends from
-   * session start to unplugTime (if recorded) or endTime, capturing both in-session
-   * pausing and post-session parking in one pass.
+   * in idle statuses (SuspendedEVSE, SuspendedEV, Finishing). The window covers the full
+   * session: from start_date_time to unplugTime (= session end for command-stop sessions),
+   * so all blocked/idle time — mid-session pauses and post-charging waiting — is captured
+   * before the session end, not after it.
    *
    * OCPP evseId is taken from the first TransactionEvent's EvseType.id, which holds the
    * raw OCPP integer used in StatusNotification — not the DB FK on the Transaction row.
@@ -329,8 +330,8 @@ export class CdrMapper extends BaseTransactionMapper {
     const ocppEvseId: number | null | undefined = (transaction.transactionEvents?.[0] as any)?.EvseType?.id;
 
     // OCPP 1.6 path: evseId is absent from StatusNotifications; fall back to
-    // timeSpentCharging subtraction, which covers in-session idle only
-    // (no post-session parking in 1.6 — session ends at StopTransaction).
+    // timeSpentCharging subtraction (totalConnectedTime − chargingTime).
+    // Uses unplugTime as session end so post-charging parking is included.
     if (!stationId || ocppEvseId == null) {
       return this.calculateNonChargingHoursFromTimeSpentCharging(session, transaction);
     }
@@ -395,7 +396,7 @@ export class CdrMapper extends BaseTransactionMapper {
   ): number {
     if (transaction.timeSpentCharging == null) return 0;
     const sessionStartMs = this.toMs(session.start_date_time);
-    const sessionEndMs = this.toMs(transaction.endTime ?? session.end_date_time);
+    const sessionEndMs = this.toMs(transaction.customData?.unplugTime ?? transaction.endTime ?? session.end_date_time);
     const chargingSeconds = Number(transaction.timeSpentCharging);
     if (sessionStartMs == null || sessionEndMs == null || !Number.isFinite(chargingSeconds)) return 0;
     const totalConnectedHours = Math.max(sessionEndMs - sessionStartMs, 0) / 3600000;
