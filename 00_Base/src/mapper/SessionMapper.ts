@@ -186,9 +186,7 @@ export class SessionMapper extends BaseTransactionMapper {
     }
 
     if (transaction.endTime !== undefined) {
-      session.end_date_time = transaction.endTime
-        ? toISOStringIfNeeded(transaction.endTime)
-        : null;
+      session.end_date_time = this.getSessionEndDateTime(transaction);
     }
 
     if (transaction.totalKwh !== undefined) {
@@ -275,9 +273,7 @@ export class SessionMapper extends BaseTransactionMapper {
     }
 
     if (transaction.endTime !== undefined) {
-      session.end_date_time = transaction.endTime
-        ? toISOStringIfNeeded(transaction.endTime)
-        : null;
+      session.end_date_time = this.getSessionEndDateTime(transaction);
     }
 
     if (transaction.totalKwh !== undefined) {
@@ -329,9 +325,7 @@ export class SessionMapper extends BaseTransactionMapper {
             );
             return toISOStringIfNeeded(transaction.createdAt!, true);
           })(),
-      end_date_time: transaction.endTime
-        ? toISOStringIfNeeded(transaction.endTime)
-        : null,
+      end_date_time: this.getSessionEndDateTime(transaction),
       kwh: transaction.totalKwh || 0,
       cdr_token: this.createCdrToken(token),
       // TODO: Implement other auth methods
@@ -484,8 +478,22 @@ export class SessionMapper extends BaseTransactionMapper {
   }
 
 
+  private getSessionEndDateTime(transaction: Partial<ITransactionDto>): string | null {
+    if (!transaction.endTime) return null;
+    // Physical disconnect: endTime IS the unplug time (both OCPP 1.6 and 2.0.1)
+    if (transaction.stoppedReason === 'EVDisconnected') return toISOStringIfNeeded(transaction.endTime) ?? null;
+    // All other stops: session ends when the car physically disconnects (Available → unplugTime)
+    const unplugTime = transaction.customData?.unplugTime;
+    if (unplugTime) return toISOStringIfNeeded(unplugTime) ?? null;
+    // Charging stopped but car still connected — no session end yet
+    return null;
+  }
+
   private getTransactionStatus(transaction: ITransactionDto): SessionStatus {
-    // TODO: Implement other session status
-    return transaction.endTime ? SessionStatus.COMPLETED : SessionStatus.ACTIVE;
+    if (!transaction.endTime) return SessionStatus.ACTIVE;
+    if (transaction.stoppedReason === 'EVDisconnected') return SessionStatus.COMPLETED;
+    if (transaction.customData?.unplugTime) return SessionStatus.COMPLETED;
+    // Charging stopped but car still connected (parking) — session still active
+    return SessionStatus.ACTIVE;
   }
 }
