@@ -10,6 +10,7 @@ import {
   CdrBroadcaster,
   DtoEventObjectType,
   DtoEventType,
+  EvseStatus,
   GET_RECENTLY_ENDED_TRANSACTION_BY_EVSE_QUERY,
   LocationsBroadcaster,
   GET_TRANSACTION_BY_ID_QUERY,
@@ -30,7 +31,6 @@ import {
   TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE,
 } from '@citrineos/ocpi-base';
 import { ILogObj, Logger } from 'tslog';
-import { EvseStatus } from '@citrineos/ocpi-base/src/model/EvseStatus';
 import { Inject, Service } from 'typedi';
 import { SessionsModuleApi } from './module/SessionsModuleApi';
 
