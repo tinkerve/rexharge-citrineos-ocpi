@@ -83,6 +83,13 @@ export const GET_LOCATIONS_QUERY = gql`
             updatedAt
             tariffs: Tariffs {
               id
+              currency
+              pricePerKwh
+              pricePerMin
+              pricePerSession
+              authorizationAmount
+              paymentFee
+              taxRate
             }
           }
         }
@@ -165,6 +172,13 @@ export const GET_LOCATION_BY_ID_QUERY = gql`
             updatedAt
             tariffs: Tariffs {
               id
+              currency
+              pricePerKwh
+              pricePerMin
+              pricePerSession
+              authorizationAmount
+              paymentFee
+              taxRate
             }
           }
         }
@@ -205,6 +219,38 @@ export const GET_EVSE_BY_ID_QUERY = gql`
           removed
           createdAt
           updatedAt
+          connectors: Connectors {
+            id
+            stationId
+            evseId
+            connectorId
+            evseTypeConnectorId
+            format
+            maximumAmperage
+            maximumPowerWatts
+            maximumVoltage
+            powerType
+            termsAndConditionsUrl
+            type
+            status
+            errorCode
+            timestamp
+            info
+            vendorId
+            vendorErrorCode
+            createdAt
+            updatedAt
+            tariffs: Tariffs {
+              id
+              currency
+              pricePerKwh
+              pricePerMin
+              pricePerSession
+              authorizationAmount
+              paymentFee
+              taxRate
+            }
+          }
         }
       }
     }

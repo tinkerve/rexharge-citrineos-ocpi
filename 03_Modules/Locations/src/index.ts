@@ -9,8 +9,11 @@ import {
   DtoEventType,
   EvseMapper,
   GET_CHARGING_STATION_BY_ID_QUERY,
+  GET_EVSE_BY_ID_QUERY,
   GetChargingStationByIdQueryResult,
   GetChargingStationByIdQueryVariables,
+  GetEvseByIdQueryResult,
+  GetEvseByIdQueryVariables,
   IDtoEvent,
   LocationsBroadcaster,
   OcpiConfig,
@@ -26,6 +29,7 @@ import {
   IConnectorDto,
   IEvseDto,
   ILocationDto,
+  ITenantDto,
 } from '@citrineos/base';
 import { Inject, Service } from 'typedi';
 import { EvseStatus } from '@citrineos/ocpi-base/src/model/EvseStatus';
@@ -207,7 +211,7 @@ export class LocationsModule extends AbstractDtoModule implements OcpiModule {
     connectorDto.chargingStation = chargingStationResponse
       .ChargingStations[0] as IChargingStationDto;
 
-    await this.locationsBroadcaster.broadcastPutConnector(tenant, connectorDto);
+    await this.broadcastParentEvse(tenant, connectorDto);
   }
 
   @AsDtoEventHandler(
@@ -286,12 +290,45 @@ export class LocationsModule extends AbstractDtoModule implements OcpiModule {
         aggregatedStatus,
       );
     } else {
-      // Non-status updates should be broadcasted at connector level
-      await this.locationsBroadcaster.broadcastPatchConnector(
-        tenant,
-        connectorDto,
-      );
+      // Non-status updates must re-broadcast the whole parent EVSE so
+      // tariff reconciliation across sibling connectors always applies.
+      await this.broadcastParentEvse(tenant, connectorDto);
     }
+  }
+
+  private async broadcastParentEvse(
+    tenant: ITenantDto,
+    connectorDto: Partial<IConnectorDto>,
+  ): Promise<void> {
+    const locationId = connectorDto.chargingStation?.locationId;
+    const stationId = connectorDto.stationId;
+    const evseId = connectorDto.evseId;
+    if (locationId == null || !stationId || evseId == null) {
+      this._logger.error(
+        `Location ID, Station ID, or EVSE ID missing for Connector ${connectorDto.id}, cannot broadcast parent EVSE.`,
+      );
+      return;
+    }
+
+    const evseResponse = await this.ocpiGraphqlClient.request<
+      GetEvseByIdQueryResult,
+      GetEvseByIdQueryVariables
+    >(GET_EVSE_BY_ID_QUERY, { locationId, stationId, evseId });
+
+    const station = evseResponse.Locations?.[0]?.chargingPool?.[0];
+    const evse = station?.evses?.[0];
+    if (!station || !evse) {
+      this._logger.error(
+        `EVSE not found for Location ${locationId}, Station ${stationId}, EVSE ${evseId}, cannot broadcast.`,
+      );
+      return;
+    }
+
+    const evseDto = evse as IEvseDto;
+    evseDto.chargingStation = station as IChargingStationDto;
+    evseDto.tenant = tenant;
+
+    await this.locationsBroadcaster.broadcastPutEvse(tenant, evseDto);
   }
 
   private isStatusOnlyUpdate(connectorDto: Partial<IConnectorDto>): boolean {

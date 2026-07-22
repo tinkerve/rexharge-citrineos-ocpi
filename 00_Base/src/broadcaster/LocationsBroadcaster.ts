@@ -4,19 +4,13 @@
 
 import {
   HttpMethod,
-  IConnectorDto,
   IEvseDto,
   ILocationDto,
   ITenantDto,
 } from '@citrineos/base';
 import { ILogObj, Logger } from 'tslog';
 import { Service } from 'typedi';
-import {
-  ConnectorMapper,
-  EvseMapper,
-  LocationMapper,
-} from '../mapper/LocationMapper';
-import { ConnectorDTO } from '../model/DTO/ConnectorDTO';
+import { EvseMapper, LocationMapper } from '../mapper/LocationMapper';
 import { EvseDTO, UID_FORMAT } from '../model/DTO/EvseDTO';
 import { LocationDTO } from '../model/DTO/LocationDTO';
 import { EvseStatus } from '../model/EvseStatus';
@@ -163,66 +157,6 @@ export class LocationsBroadcaster extends BaseBroadcaster {
       });
     } catch (e) {
       this.logger.error(`broadcast${method}Evse failed for ${path}`, e);
-    }
-  }
-
-  async broadcastPutConnector(
-    tenant: ITenantDto,
-    connectorDto: IConnectorDto,
-  ): Promise<void> {
-    const locationId = connectorDto.chargingStation?.locationId;
-    if (!locationId) throw new Error('Location ID missing in Connector data');
-    const connector = ConnectorMapper.fromGraphql(connectorDto);
-    if (!connector) throw new Error('Failed to map Connector data');
-    const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(connectorDto.stationId, connectorDto.evseId)}/${connectorDto.id}`;
-    await this.broadcastConnector(
-      tenant,
-      connector,
-      HttpMethod.Put,
-      path,
-      locationId,
-    );
-  }
-
-  async broadcastPatchConnector(
-    tenant: ITenantDto,
-    connectorDto: Partial<IConnectorDto>,
-  ): Promise<void> {
-    const locationId = connectorDto.chargingStation?.locationId;
-    if (!locationId) throw new Error('Location ID missing in Connector data');
-    const connector = ConnectorMapper.fromPartialGraphql(connectorDto);
-    if (!connector) throw new Error('Failed to map Connector data');
-    const path = `/${tenant.countryCode}/${tenant.partyId}/${locationId}/${UID_FORMAT(connectorDto.stationId!, connectorDto.evseId!)}/${connectorDto.id}`;
-    await this.broadcastConnector(
-      tenant,
-      connector,
-      HttpMethod.Patch,
-      path,
-      locationId,
-    );
-  }
-
-  private async broadcastConnector(
-    tenant: ITenantDto,
-    connectorData: Partial<ConnectorDTO>,
-    method: HttpMethod,
-    path: string,
-    locationId?: number,
-  ): Promise<void> {
-    try {
-      await this.locationsClientApi.broadcastToClients({
-        cpoCountryCode: tenant.countryCode!,
-        cpoPartyId: tenant.partyId!,
-        moduleId: ModuleId.Locations,
-        interfaceRole: InterfaceRole.RECEIVER,
-        httpMethod: method,
-        schema: OcpiEmptyResponseSchema,
-        body: connectorData,
-        path: path,
-        locationId,
-      });
-    } catch (e) {
-      this.logger.error(`broadcast${method}Connector failed for ${path}`, e);
     }
   }
 }

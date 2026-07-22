@@ -32,6 +32,10 @@ import { ParkingType } from '../model/ParkingType';
 import { Facilities } from '../model/Facilities';
 import { Hours } from '../model/Hours';
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
+import {
+  ReconcilerInput,
+  reconcileEvseConnectorTariffs,
+} from './TariffReconciler';
 
 export class LocationMapper {
   static fromGraphql(location: ILocationDto): LocationDTO {
@@ -199,6 +203,13 @@ export class LocationMapper {
   }
 }
 
+/** Narrows an `IConnectorDto` to one whose `id` is present (not `undefined`/`null`). */
+function hasDefinedId(
+  raw: IConnectorDto,
+): raw is IConnectorDto & { id: number } {
+  return raw.id !== undefined && raw.id !== null;
+}
+
 export class EvseMapper {
   static fromGraphql(
     station: IChargingStationDto,
@@ -216,6 +227,16 @@ export class EvseMapper {
       connectors = undefined;
       // return;
       // TODO: solve this case
+    } else if (connectors.length > 1) {
+      connectors = EvseMapper.reconcileConnectorTariffs(
+        evse.connectors || [],
+        connectors,
+        {
+          stationId: station.id,
+          evseId: evse.id,
+          uid: UID_FORMAT(station.id, evse.id!),
+        },
+      );
     }
 
     return {
@@ -254,6 +275,21 @@ export class EvseMapper {
     const connectors = evse.connectors
       ?.map(ConnectorMapper.fromGraphql)
       .filter((c) => c !== undefined);
+    const reconciledConnectors =
+      connectors && connectors.length > 1
+        ? EvseMapper.reconcileConnectorTariffs(
+            evse.connectors || [],
+            connectors,
+            {
+              stationId: station.id,
+              evseId: evse.id,
+              uid:
+                station.id !== undefined && evse.id !== undefined
+                  ? UID_FORMAT(station.id, evse.id)
+                  : undefined,
+            },
+          )
+        : connectors;
 
     return {
       evse_id: evse.evseId,
@@ -277,10 +313,79 @@ export class EvseMapper {
       parking_restrictions: station.parkingRestrictions
         ?.map((r) => EvseMapper.mapEvseParkingRestrictions(r))
         .filter((r) => r !== null),
-      connectors: connectors,
+      connectors: reconciledConnectors,
       floor_level: station.floorLevel,
       last_updated: toISOStringIfNeeded(evse.updatedAt),
     };
+  }
+
+  /**
+   * Ensures that, within one EVSE, every connector sharing the same
+   * `standard` (OCPI ConnectorType) exposes the same `tariff_ids` — some
+   * charge point firmware/OCPP configs can otherwise assign divergent
+   * tariffs to two connectors of the same type on one EVSE, which upstream
+   * eMSP validators (e.g. Gentari) reject. Delegates the actual decision to
+   * the pure `reconcileEvseConnectorTariffs`, then logs its warnings/infos
+   * with EVSE identity context and overwrites only `tariff_ids` on the
+   * already-mapped connectors — order and all other fields are untouched.
+   */
+  private static reconcileConnectorTariffs(
+    rawConnectors: IConnectorDto[],
+    connectors: ConnectorDTO[],
+    context: { stationId?: string; evseId?: number; uid?: string },
+  ): ConnectorDTO[] {
+    const rawById = new Map<string, IConnectorDto & { id: number }>();
+    for (const raw of rawConnectors) {
+      if (hasDefinedId(raw)) {
+        rawById.set(raw.id.toString(), raw);
+      }
+    }
+
+    const inputs: ReconcilerInput[] = [];
+    for (const connector of connectors) {
+      const raw = rawById.get(connector.id);
+      if (!raw) {
+        continue;
+      }
+      inputs.push({
+        connectorId: raw.id,
+        standard: connector.standard,
+        tariffIds: connector.tariff_ids ?? [],
+        tariffs: raw.tariffs ?? [],
+      });
+    }
+
+    if (inputs.length <= 1) {
+      return connectors;
+    }
+
+    const { tariffIdsByConnectorId, warnings, infos } =
+      reconcileEvseConnectorTariffs(inputs);
+
+    if (warnings.length > 0 || infos.length > 0) {
+      const logger = Container.get(Logger);
+      const prefix = `stationId=${context.stationId} evseId=${context.evseId} uid=${context.uid}`;
+      warnings.forEach((message) =>
+        logger.warn(`Tariff conflict reconciled: ${prefix} ${message}`),
+      );
+      infos.forEach((message) =>
+        logger.info(
+          `Duplicate tariff content reconciled: ${prefix} ${message}`,
+        ),
+      );
+    }
+
+    return connectors.map((connector) => {
+      const raw = rawById.get(connector.id);
+      if (!raw) {
+        return connector;
+      }
+      const normalizedTariffIds = tariffIdsByConnectorId.get(raw.id);
+      if (!normalizedTariffIds) {
+        return connector;
+      }
+      return { ...connector, tariff_ids: normalizedTariffIds };
+    });
   }
 
   static mapEvseStatusFromConnectors(connectors: IConnectorDto[]): EvseStatus {
