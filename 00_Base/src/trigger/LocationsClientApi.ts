@@ -65,6 +65,12 @@ export class LocationsClientApi extends BaseClientApi {
       partnerProfile,
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -88,6 +94,12 @@ export class LocationsClientApi extends BaseClientApi {
       partnerProfile,
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -110,6 +122,12 @@ export class LocationsClientApi extends BaseClientApi {
       partnerProfile,
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -136,6 +154,11 @@ export class LocationsClientApi extends BaseClientApi {
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
       requestBody,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -161,6 +184,11 @@ export class LocationsClientApi extends BaseClientApi {
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
       requestBody,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -185,6 +213,11 @@ export class LocationsClientApi extends BaseClientApi {
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
       requestBody,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -211,6 +244,11 @@ export class LocationsClientApi extends BaseClientApi {
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
       connector,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -236,6 +274,11 @@ export class LocationsClientApi extends BaseClientApi {
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
       evse,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 
@@ -260,6 +303,11 @@ export class LocationsClientApi extends BaseClientApi {
       true,
       `${this.getUrl(partnerProfile)}/${path}`,
       location,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      locationId,
     );
   }
 }

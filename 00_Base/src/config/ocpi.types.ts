@@ -168,6 +168,20 @@ export const ocpiConfigInputSchema = z.object({
     }),
   }),
 
+  requestLog: z
+    .object({
+      enabled: z.boolean().default(false),
+      gatewayEndpoint: z.string().default(''),
+      sharedSecret: z.string().default(''),
+      timeoutMs: z.number().int().positive().default(2000),
+    })
+    .default({
+      enabled: false,
+      gatewayEndpoint: '',
+      sharedSecret: '',
+      timeoutMs: 2000,
+    }),
+
   // OCPI-specific settings
   logLevel: z.number().min(0).max(6).default(2).optional(),
   defaultPageLimit: z.number().int().positive().default(50).optional(),
@@ -177,7 +191,7 @@ export const ocpiConfigInputSchema = z.object({
   oidc: oidcConfigSchema,
 });
 
-export type OcpiConfigInput = z.infer<typeof ocpiConfigInputSchema>;
+export type OcpiConfigInput = z.input<typeof ocpiConfigInputSchema>;
 
 /**
  * Processed/validated OCPI Configuration Schema
@@ -319,6 +333,52 @@ export const ocpiConfigSchema = z.object({
       unlockConnectorRequestUrl: z.string(),
     }),
   }),
+
+  requestLog: z
+    .object({
+      enabled: z.boolean(),
+      gatewayEndpoint: z.string(),
+      sharedSecret: z.string(),
+      timeoutMs: z.number().int().positive(),
+    })
+    .superRefine((requestLog, context) => {
+      if (!requestLog.enabled) return;
+
+      if (!requestLog.gatewayEndpoint.trim()) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['gatewayEndpoint'],
+          message:
+            'Gateway endpoint is required when request logging is enabled',
+        });
+      } else {
+        try {
+          const endpoint = new URL(requestLog.gatewayEndpoint);
+          if (
+            !['http:', 'https:'].includes(endpoint.protocol) ||
+            endpoint.username ||
+            endpoint.password
+          ) {
+            throw new Error('Unsupported endpoint protocol');
+          }
+        } catch {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['gatewayEndpoint'],
+            message: 'Gateway endpoint must be an absolute HTTP(S) URL',
+          });
+        }
+      }
+
+      if (requestLog.sharedSecret.trim().length < 32) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sharedSecret'],
+          message:
+            'Shared secret must contain at least 32 characters when request logging is enabled',
+        });
+      }
+    }),
 
   logLevel: z.number().min(0).max(6),
   defaultPageLimit: z.number().int().positive(),

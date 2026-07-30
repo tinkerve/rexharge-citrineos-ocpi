@@ -11,6 +11,7 @@ import {
 import { ILogObj, Logger } from 'tslog';
 import { IRequestOptions, IRestResponse, RestClient } from 'typed-rest-client';
 import { IHeaders, IRequestQueryParams } from 'typed-rest-client/Interfaces';
+import { getUrl as getRequestUrl } from 'typed-rest-client/Util';
 import { Inject } from 'typedi';
 import { v4 as uuidv4 } from 'uuid';
 import { ZodTypeAny } from 'zod';
@@ -35,6 +36,8 @@ import { VersionNumber } from '../model/VersionNumber';
 import { OcpiHttpHeader } from '../util/OcpiHttpHeader';
 import { base64Encode } from '../util/Util';
 import { PaginatedParams } from './param/PaginatedParams';
+import { OcpiRequestLogClient } from '../services/OcpiRequestLogClient';
+import { OcpiRequestLogPayload } from '../types/ocpi-request-log.types';
 
 export interface RequiredOcpiParams {
   clientUrl: string;
@@ -92,6 +95,8 @@ export abstract class BaseClientApi {
   protected logger!: Logger<ILogObj>;
   @Inject()
   protected ocpiGraphqlClient!: OcpiGraphqlClient;
+  @Inject()
+  protected ocpiRequestLogClient!: OcpiRequestLogClient;
 
   CONTROLLER_PATH = 'null';
   private restClient!: RestClient;
@@ -142,6 +147,7 @@ export abstract class BaseClientApi {
     otherParams?: Record<string, string | number | (string | number)[]>,
     path?: string,
     overrideToken?: string,
+    locationId?: string | number,
   ): Promise<any> {
     if (!partnerProfile) {
       const response = await this.ocpiGraphqlClient.request<
@@ -198,32 +204,84 @@ export abstract class BaseClientApi {
       }
     }
     options.queryParameters = queryParameters;
-    switch (httpMethod) {
-      case HttpMethod.Get:
-        this.logger.debug(`Sending GET request to ${url}`);
-        return this.getRaw<T>(url, options).then((response) =>
-          this.handleResponse(schema, response),
-        );
-      case HttpMethod.Post:
-        this.logger.debug(`Sending POST request to ${url}`, body);
-        return this.createRaw<T>(url, body, options).then((response) =>
-          this.handleResponse(schema, response),
-        );
-      case HttpMethod.Put:
-        this.logger.debug(`Sending PUT request to ${url}`, body);
-        return this.replaceRaw<T>(url, body, options).then((response) =>
-          this.handleResponse(schema, response),
-        );
-      case HttpMethod.Patch:
-        this.logger.debug(`Sending PATCH request to ${url}`, body);
-        return this.updateRaw<T>(url, body, options).then((response) =>
-          this.handleResponse(schema, response),
-        );
-      case HttpMethod.Delete:
-        this.logger.debug(`Sending DELETE request to ${url}`);
-        return this.delRaw<T>(url, options).then((response) =>
-          this.handleResponse(schema, response),
-        );
+    const effectiveUrl = getRequestUrl(
+      url,
+      undefined,
+      httpMethod === HttpMethod.Get || httpMethod === HttpMethod.Delete
+        ? queryParameters
+        : undefined,
+    );
+    const requestLoggingEnabled = this.ocpiRequestLogClient?.enabled === true;
+    const startedAt = Date.now();
+    let rawResponse: IRestResponse<unknown> | undefined;
+    let responseForLog: IRestResponse<unknown> | undefined;
+
+    try {
+      switch (httpMethod) {
+        case HttpMethod.Get:
+          this.logger.debug(`Sending GET request to ${url}`);
+          rawResponse = await this.getRaw(url, options);
+          break;
+        case HttpMethod.Post:
+          this.logger.debug(`Sending POST request to ${url}`, body);
+          rawResponse = await this.createRaw(url, body, options);
+          break;
+        case HttpMethod.Put:
+          this.logger.debug(`Sending PUT request to ${url}`, body);
+          rawResponse = await this.replaceRaw(url, body, options);
+          break;
+        case HttpMethod.Patch:
+          this.logger.debug(`Sending PATCH request to ${url}`, body);
+          rawResponse = await this.updateRaw(url, body, options);
+          break;
+        case HttpMethod.Delete:
+          this.logger.debug(`Sending DELETE request to ${url}`);
+          rawResponse = await this.delRaw(url, options);
+          break;
+      }
+
+      if (requestLoggingEnabled) {
+        responseForLog = this.snapshotResponse(rawResponse!);
+      }
+      const parsedResponse = this.handleResponse(schema, rawResponse!);
+      if (requestLoggingEnabled) {
+        this.forwardRequestLog({
+          fromCountryCode,
+          fromPartyId,
+          toCountryCode,
+          toPartyId,
+          method: httpMethod,
+          url: effectiveUrl,
+          headers: additionalHeaders,
+          body,
+          response: responseForLog,
+          durationMs: Date.now() - startedAt,
+          locationId,
+        });
+      }
+      return parsedResponse;
+    } catch (error) {
+      if (requestLoggingEnabled) {
+        const errorResponse =
+          error instanceof UnsuccessfulRequestException && error.iRestResponse
+            ? this.snapshotResponse(error.iRestResponse)
+            : (responseForLog ?? this.extractRestResponse(error));
+        this.forwardRequestLog({
+          fromCountryCode,
+          fromPartyId,
+          toCountryCode,
+          toPartyId,
+          method: httpMethod,
+          url: effectiveUrl,
+          headers: additionalHeaders,
+          body,
+          response: errorResponse,
+          durationMs: Date.now() - startedAt,
+          locationId,
+          error,
+        });
+      }
+      throw error;
     }
   }
 
@@ -263,6 +321,56 @@ export abstract class BaseClientApi {
     options?: IRequestOptions,
   ): Promise<IRestResponse<T>> {
     return this.restClient.replace<T>(url, body, options);
+  }
+
+  private snapshotResponse(
+    response: IRestResponse<unknown>,
+  ): IRestResponse<unknown> {
+    let result = response.result;
+    try {
+      result = structuredClone(response.result);
+    } catch {
+      // typed-rest-client responses are JSON, but retain the original value if
+      // a custom responseProcessor returns a non-cloneable object.
+    }
+    return {
+      statusCode: response.statusCode,
+      result,
+      headers:
+        response.headers && typeof response.headers === 'object'
+          ? { ...response.headers }
+          : {},
+    };
+  }
+
+  private extractRestResponse(
+    error: unknown,
+  ): IRestResponse<unknown> | undefined {
+    if (!error || typeof error !== 'object') return undefined;
+
+    const typedRestError = error as {
+      statusCode?: unknown;
+      result?: unknown;
+      responseHeaders?: unknown;
+    };
+    if (
+      typeof typedRestError.statusCode !== 'number' ||
+      !Number.isInteger(typedRestError.statusCode) ||
+      typedRestError.statusCode < 100 ||
+      typedRestError.statusCode > 599
+    ) {
+      return undefined;
+    }
+
+    return {
+      statusCode: Number(typedRestError.statusCode),
+      result: 'result' in typedRestError ? typedRestError.result : null,
+      headers:
+        typedRestError.responseHeaders &&
+        typeof typedRestError.responseHeaders === 'object'
+          ? typedRestError.responseHeaders
+          : {},
+    };
   }
 
   protected getOffsetFromLink(link: string): number {
@@ -344,6 +452,8 @@ export abstract class BaseClientApi {
           paginatedParams,
           otherParams,
           path,
+          undefined,
+          locationId,
         );
         successes.push({ partner, response: partnerResponse });
         this.logger.debug(
@@ -409,5 +519,57 @@ export abstract class BaseClientApi {
 
   private initRestClient() {
     this.restClient = new RestClient(`CitrineOS OCPI ${this.CONTROLLER_PATH}`);
+  }
+
+  private forwardRequestLog(input: {
+    fromCountryCode: string;
+    fromPartyId: string;
+    toCountryCode: string;
+    toPartyId: string;
+    method: HttpMethod;
+    url: string;
+    headers: IHeaders;
+    body?: unknown;
+    response?: IRestResponse<unknown>;
+    durationMs: number;
+    locationId?: string | number;
+    error?: unknown;
+  }): void {
+    if (!this.ocpiRequestLogClient?.enabled) return;
+
+    const payload: OcpiRequestLogPayload = {
+      direction: 'OUTGOING',
+      request: {
+        method: input.method,
+        url: input.url,
+        headers: input.headers,
+        body: input.body,
+      },
+      response: input.response
+        ? {
+            status: input.response.statusCode,
+            headers: input.response.headers as Record<string, unknown>,
+            body: input.response.result,
+          }
+        : undefined,
+      error:
+        input.error instanceof Error
+          ? { name: input.error.name, message: input.error.message }
+          : undefined,
+      durationMs: input.durationMs,
+      partner: {
+        countryCode: input.toCountryCode,
+        partyId: input.toPartyId,
+      },
+      locationId: input.locationId,
+      requestId: input.headers[OcpiHttpHeader.XRequestId],
+      correlationId: input.headers[OcpiHttpHeader.XCorrelationId],
+      fromCountryCode: input.fromCountryCode,
+      fromPartyId: input.fromPartyId,
+      toCountryCode: input.toCountryCode,
+      toPartyId: input.toPartyId,
+    };
+
+    void this.ocpiRequestLogClient.send(payload);
   }
 }

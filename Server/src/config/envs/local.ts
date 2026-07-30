@@ -94,6 +94,13 @@ export function createLocalOcpiConfig(): OcpiConfigInput {
       },
     },
 
+    requestLog: {
+      enabled: process.env.OCPI_REQUEST_LOG_ENABLED === 'true',
+      gatewayEndpoint: process.env.OCPI_REQUEST_LOG_GATEWAY_ENDPOINT || '',
+      sharedSecret: process.env.OCPI_REQUEST_LOG_SHARED_SECRET || '',
+      timeoutMs: parseInt(process.env.OCPI_REQUEST_LOG_TIMEOUT_MS || '2000'),
+    },
+
     messageBroker: {
       amqp: {
         url: process.env.AMQP_URL || 'amqp://guest:guest@localhost:5672',

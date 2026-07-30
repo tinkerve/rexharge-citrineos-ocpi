@@ -44,6 +44,9 @@ const getZodSchemaKeyMap = (schema: z.ZodType): Record<string, any> => {
   if (schema instanceof z.ZodNullable || schema instanceof z.ZodOptional) {
     return getZodSchemaKeyMap(schema.unwrap());
   }
+  if (schema instanceof z.ZodDefault) {
+    return getZodSchemaKeyMap(schema.removeDefault());
+  }
   if (schema instanceof z.ZodArray) {
     return getZodSchemaKeyMap(schema.element);
   }
@@ -175,10 +178,11 @@ function parseEnvValue(value: string): any {
  */
 export function defineOcpiConfig(config: OcpiConfigInput): OcpiConfig {
   const configKeyMap = getZodSchemaKeyMap(ocpiConfigInputSchema);
+  const configWithDefaults = ocpiConfigInputSchema.parse(config);
 
   // Apply environment variable overrides
   const configWithEnvOverrides = mergeOcpiConfigFromEnvVars(
-    config,
+    configWithDefaults,
     process.env,
     configKeyMap,
   );
