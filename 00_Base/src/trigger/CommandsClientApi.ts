@@ -17,11 +17,14 @@ import {
 } from '../util/Consts';
 import { CacheWrapper } from '../util/CacheWrapper';
 import { ILogObj, Logger } from 'tslog';
+import { OcpiConfig, OcpiConfigToken } from '../config/ocpi.types';
 
 @Service()
 export class CommandsClientApi extends BaseClientApi {
   @Inject()
   protected logger!: Logger<ILogObj>;
+  @Inject(OcpiConfigToken)
+  protected config!: OcpiConfig;
 
   protected cache!: ICache;
 
@@ -50,7 +53,7 @@ export class CommandsClientApi extends BaseClientApi {
       commandId,
       COMMAND_RESPONSE_URL_CACHE_RESOLVED,
       COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
-      5, // Flush the resolution after a few seconds so that it doesn't stay in cache indefinitely
+      this.config.commands.timeout, // Must outlive the onChange() fallback window (util/CommandExecutor.ts) or that window's GET sees the key already expired and reports a false timeout
     );
 
     // Debug: Verify cache value was set correctly
