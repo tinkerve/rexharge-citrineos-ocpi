@@ -54,7 +54,7 @@ export class TariffMapper {
                 type: TariffDimensionType.TIME,
                 price: coreTariff.pricePerMin * MINUTES_IN_HOUR,
                 vat: coreTariff.taxRate ?? 0,
-                step_size: 1,
+                step_size: 60,
               },
             ]
           : []),
