@@ -19,3 +19,10 @@ export const TOKEN_ID_TO_AUTH_REF_CACHE_NAMESPACE = 'tokenIdToAuthRef';
  * was resolved instead of timed out and doesn't attempt to send a command result.
  */
 export const COMMAND_RESPONSE_URL_CACHE_RESOLVED = 'resolved';
+/**
+ * Added to COMMANDS_TIMEOUT when setting the resolved-marker's cache TTL so it
+ * outlives the onChange() fallback window in CommandExecutor (util/CommandExecutor.ts),
+ * which waits the same COMMANDS_TIMEOUT duration. Without this margin, a fast-resolving
+ * command's cache entry can expire right as the fallback checks it, producing a false TIMEOUT.
+ */
+export const COMMAND_RESOLVED_CACHE_TTL_BUFFER_SECONDS = 30;

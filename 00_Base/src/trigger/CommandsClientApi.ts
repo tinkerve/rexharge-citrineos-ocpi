@@ -12,6 +12,7 @@ import { ModuleId } from '../model/ModuleId';
 import { HttpMethod, ICache, OCPIRegistration } from '@citrineos/base';
 import { CommandResult } from '../model/CommandResult';
 import {
+  COMMAND_RESOLVED_CACHE_TTL_BUFFER_SECONDS,
   COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
   COMMAND_RESPONSE_URL_CACHE_RESOLVED,
 } from '../util/Consts';
@@ -53,7 +54,7 @@ export class CommandsClientApi extends BaseClientApi {
       commandId,
       COMMAND_RESPONSE_URL_CACHE_RESOLVED,
       COMMAND_RESPONSE_URL_CACHE_NAMESPACE,
-      this.config.commands.timeout, // Must outlive the onChange() fallback window (util/CommandExecutor.ts) or that window's GET sees the key already expired and reports a false timeout
+      this.config.commands.timeout + COMMAND_RESOLVED_CACHE_TTL_BUFFER_SECONDS,
     );
 
     // Debug: Verify cache value was set correctly
