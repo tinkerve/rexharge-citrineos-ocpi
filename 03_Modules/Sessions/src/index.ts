@@ -141,13 +141,17 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
   private async isTransactionBeginMeterValue(
     meterValueDto: IMeterValueDto,
   ): Promise<boolean> {
+    if (!meterValueDto.transactionDatabaseId) {
+      return false;
+    }
     try {
       // Fetch the transaction to get its start time
       const transactionResponse = await this.ocpiGraphqlClient.request<
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
       >(GET_TRANSACTION_BY_ID_QUERY, {
-        id: Number(meterValueDto.transactionId!),
+        // N.B. `id` is the Transactions primary key, NOT the OCPP transactionId.
+        id: meterValueDto.transactionDatabaseId,
       });
 
       if (!transactionResponse.Transactions[0]) {
@@ -363,11 +367,19 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
         return;
       }
 
+      if (!meterValueDto.transactionDatabaseId) {
+        this._logger.warn(
+          `Transaction database ID missing in Meter Value notification for Transaction ${meterValueDto.transactionId}, cannot broadcast.`,
+        );
+        return;
+      }
+
       const fullTransactionDtoResponse = await this.ocpiGraphqlClient.request<
         GetTransactionByTransactionIdQueryResult,
         GetTransactionByTransactionIdQueryVariables
       >(GET_TRANSACTION_BY_ID_QUERY, {
-        id: Number(meterValueDto.transactionId),
+        // N.B. `id` is the Transactions primary key, NOT the OCPP transactionId.
+        id: meterValueDto.transactionDatabaseId,
       });
       const fullTransactionDto = fullTransactionDtoResponse.Transactions[0] as
         | ITransactionDto

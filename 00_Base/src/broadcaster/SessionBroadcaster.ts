@@ -112,6 +112,10 @@ export class SessionBroadcaster extends BaseBroadcaster {
           undefined,
           path,
         );
+      } else {
+        this.logger.warn(
+          `No eMSP partner resolved for session ${path}; skipping ${method} broadcast`,
+        );
       }
     } catch (e) {
       this.logger.error(`broadcast${method}Session failed for ${path}`, e);
