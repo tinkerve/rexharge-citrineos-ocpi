@@ -52,51 +52,56 @@ export class RedisCache implements ICache {
     classConstructor?: (() => ClassConstructor<T>) | undefined,
   ): Promise<T | null> {
     namespace = namespace || 'default';
-    key = `${namespace}:${key}`;
+    // N.B. get() applies the namespace itself, so `key` must stay un-prefixed for it.
+    const namespacedKey = `${namespace}:${key}`;
 
     return new Promise((resolve) => {
       // Create a Redis subscriber to listen for operations affecting the key
       const subscriber = createClient(this._client.options);
-      // Channel: Key-space, message: the name of the event, which is the command executed on the key
-      subscriber
-        .subscribe(`__keyspace@0__:${key}`, (channel, message) => {
-          switch (message) {
-            case 'set':
-              resolve(this.get(key, namespace, classConstructor));
-              subscriber
-                .quit()
-                .then()
-                .catch((error) => {
-                  console.log('Error quitting subscriber', error);
-                });
-              break;
-            case 'del':
-            case 'expire':
-              resolve(null);
-              subscriber
-                .quit()
-                .then()
-                .catch((error) => {
-                  console.log('Error quitting subscriber', error);
-                });
-              break;
-            default:
-              // Do nothing
-              break;
-          }
-        })
-        .then()
-        .catch((error) => {
-          console.log('Error creating Redis subscriber', error);
-        });
-      setTimeout(() => {
-        resolve(this.get(key, namespace, classConstructor));
+      let timer: NodeJS.Timeout;
+      let settled = false;
+      const settle = (value: Promise<T | null> | T | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
         subscriber
           .quit()
           .then()
           .catch((error) => {
-            console.log('Error closing Redis subscriber', error);
+            console.log('Error quitting subscriber', error);
           });
+      };
+
+      // Channel: Key-space, message: the name of the event, which is the command executed on the key
+      subscriber
+        .connect()
+        .then(() =>
+          subscriber.subscribe(
+            `__keyspace@0__:${namespacedKey}`,
+            (message: string) => {
+              switch (message) {
+                case 'set':
+                  settle(this.get(key, namespace, classConstructor));
+                  break;
+                case 'del':
+                case 'expire':
+                  settle(null);
+                  break;
+                default:
+                  // Do nothing
+                  break;
+              }
+            },
+          ),
+        )
+        .catch((error) => {
+          console.log('Error creating Redis subscriber', error);
+        });
+      timer = setTimeout(() => {
+        settle(this.get(key, namespace, classConstructor));
       }, waitSeconds * 1000);
     });
   }
