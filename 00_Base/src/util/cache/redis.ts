@@ -54,6 +54,8 @@ export class RedisCache implements ICache {
     namespace = namespace || 'default';
     // N.B. get() applies the namespace itself, so `key` must stay un-prefixed for it.
     const namespacedKey = `${namespace}:${key}`;
+    // Keyspace channels are per-database; the client may be on any db index.
+    const database = this._client.options?.database ?? 0;
 
     return new Promise((resolve) => {
       // Create a Redis subscriber to listen for operations affecting the key
@@ -80,7 +82,7 @@ export class RedisCache implements ICache {
         .connect()
         .then(() =>
           subscriber.subscribe(
-            `__keyspace@0__:${namespacedKey}`,
+            `__keyspace@${database}__:${namespacedKey}`,
             (message: string) => {
               switch (message) {
                 case 'set':
