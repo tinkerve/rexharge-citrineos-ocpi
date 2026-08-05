@@ -31,6 +31,7 @@ import { GET_TARIFF_BY_KEY_QUERY } from '../graphql/queries/tariff.queries';
 import { GET_TRANSACTION_BY_ID_QUERY } from '../graphql/queries/transaction.queries';
 import { TariffMapper } from './TariffMapper';
 import { GET_AUTHORIZATION_BY_ID } from '../graphql';
+import { MINUTES_IN_HOUR } from '../util/Consts';
 
 export abstract class BaseTransactionMapper {
   protected constructor(
@@ -171,5 +172,69 @@ export abstract class BaseTransactionMapper {
     return {
       excl_vat: Math.floor(totalKwh * tariffCost * 100) / 100,
     };
+  }
+
+  /**
+   * Fixed per-session cost (OCPI FLAT tariff dimension).
+   * Returns undefined when the tariff has no session fee.
+   */
+  protected computeFixedCost(tariff: ITariffDto): Price | undefined {
+    if (!tariff.pricePerSession) return undefined;
+    const excl_vat = this.round4(tariff.pricePerSession);
+    return this.buildPrice(excl_vat, tariff.taxRate);
+  }
+
+  /**
+   * Energy cost: kWh consumed × pricePerKwh (OCPI ENERGY tariff dimension).
+   * Returns undefined when the tariff has no energy rate.
+   */
+  protected computeEnergyCost(
+    totalKwh: number,
+    tariff: ITariffDto,
+  ): Price | undefined {
+    if (!tariff.pricePerKwh) return undefined;
+    const excl_vat = this.round4(totalKwh * tariff.pricePerKwh);
+    return this.buildPrice(excl_vat, tariff.taxRate);
+  }
+
+  /**
+   * Time cost: session duration in hours × pricePerMin × 60 (OCPI TIME dimension).
+   * TariffMapper stores the TIME price component as pricePerMin*60 (per-hour rate),
+   * so we multiply total_time (hours) by that same per-hour rate here.
+   * Returns undefined when the tariff has no time rate.
+   */
+  protected computeTimeCost(
+    totalTimeHours: number,
+    tariff: ITariffDto,
+  ): Price | undefined {
+    if (!tariff.pricePerMin) return undefined;
+    const pricePerHour = tariff.pricePerMin * MINUTES_IN_HOUR;
+    const excl_vat = this.round4(totalTimeHours * pricePerHour);
+    return this.buildPrice(excl_vat, tariff.taxRate);
+  }
+
+  protected sumCosts(costs: (Price | undefined)[], tariff: ITariffDto): Price {
+    const excl_vat = costs.reduce(
+      (acc, cost) => acc + (cost?.excl_vat ?? 0),
+      0,
+    );
+    return this.buildPrice(this.round4(excl_vat), tariff.taxRate);
+  }
+
+  /**
+   * Build a Price with optional incl_vat derived from taxRate.
+   */
+  protected buildPrice(excl_vat: number, taxRate?: number | null): Price {
+    if (taxRate) {
+      return {
+        excl_vat,
+        incl_vat: this.round4(excl_vat * (1 + taxRate)),
+      };
+    }
+    return { excl_vat };
+  }
+
+  protected round4(value: number): number {
+    return Math.round(value * 10000) / 10000;
   }
 }

@@ -12,6 +12,7 @@ import { CdrToken } from '../model/CdrToken';
 import { SessionStatus } from '../model/SessionStatus';
 import { ILogObj, Logger } from 'tslog';
 import { CdrDimension } from '../model/CdrDimension';
+import { Price } from '../model/Price';
 import { TokenDTO } from '../model/DTO/TokenDTO';
 import { BaseTransactionMapper } from './BaseTransactionMapper';
 import { LocationsService } from '../services/LocationsService';
@@ -102,6 +103,161 @@ export class SessionMapper extends BaseTransactionMapper {
       );
       return this.mapPartialTransactionWithoutContext(transaction);
     }
+  }
+
+  /**
+   * Builds the in-session progress PATCH sent on every meter value
+   * (OCPI 2.2.1 Sessions, "update charging period" example):
+   *
+   *   { kwh, charging_periods: [...], total_cost, last_updated }
+   *
+   * charging_periods carries the session's *full* period history, not just the
+   * newly observed one. OCPI defines no merge rule for arrays, so a receiver
+   * may replace rather than append: our own eMSP does exactly that
+   * (SessionsService.patchSession assigns charging_periods wholesale) and then
+   * sums every period to derive the live cost, so sending one period would
+   * collapse its running total to a single interval. A full array is correct
+   * under replace and under upsert-by-start_date_time; only blind append would
+   * duplicate, and nothing in either implementation does that.
+   *
+   * Periods with no dimensions are dropped, and charging_periods is omitted
+   * entirely when none survive — an empty array would clear what the receiver
+   * already holds.
+   */
+  public async mapMeterValueToProgressPatch(
+    transaction: ITransactionDto,
+    meterValue: IMeterValueDto,
+  ): Promise<Partial<Session>> {
+    const tariffMap = await this.getTariffsForTransactions([transaction]);
+    const tariff = tariffMap.get(transaction.id!.toString());
+
+    const session: Partial<Session> = {
+      kwh: transaction.totalKwh || 0,
+      last_updated: this.getProgressLastUpdated(transaction, meterValue),
+    };
+
+    if (tariff) {
+      session.total_cost = this.computeRunningCost(
+        transaction,
+        tariff,
+        meterValue.timestamp,
+      );
+    }
+
+    const periods = this.getChargingPeriods(
+      this.withMeterValue(transaction.meterValues, meterValue),
+      tariff ? String(tariff.id) : undefined,
+    );
+    if (periods.length > 0) {
+      session.charging_periods = periods;
+    } else {
+      this.logger.debug(
+        `Transaction ${transaction.id} has no charging periods with dimensions yet; sending progress PATCH without charging_periods`,
+      );
+    }
+
+    return session;
+  }
+
+  /**
+   * Builds the cost-only PATCH (OCPI 2.2.1 Sessions, "update total_cost" example):
+   *
+   *   { total_cost, last_updated }
+   *
+   * Sent when the running cost moves without a new meter value — e.g. a
+   * CostNotifier tick writing Transactions.totalCost while the car idles.
+   */
+  public async mapTransactionToCostPatch(
+    transaction: ITransactionDto,
+  ): Promise<Partial<Session> | undefined> {
+    const tariffMap = await this.getTariffsForTransactions([transaction]);
+    const tariff = tariffMap.get(transaction.id!.toString());
+    if (!tariff) {
+      this.logger.warn(
+        `No tariff for transaction ${transaction.id}; cannot build cost PATCH`,
+      );
+      return undefined;
+    }
+
+    const asOf = transaction.updatedAt ?? new Date();
+    return {
+      total_cost: this.computeRunningCost(transaction, tariff, asOf),
+      last_updated: toISOStringIfNeeded(asOf),
+    };
+  }
+
+  /**
+   * Running cost of a live session, using the same energy + time + fixed
+   * components (and VAT) as the final CDR, so the in-app running total
+   * converges on the receipt instead of drifting below it.
+   */
+  private computeRunningCost(
+    transaction: ITransactionDto,
+    tariff: ITariffDto,
+    asOf: Date | string,
+  ): Price {
+    const energyCost = this.computeEnergyCost(
+      transaction.totalKwh || 0,
+      tariff,
+    );
+    const timeCost = this.computeTimeCost(
+      this.elapsedHours(transaction, asOf),
+      tariff,
+    );
+    const fixedCost = this.computeFixedCost(tariff);
+    return this.sumCosts([energyCost, timeCost, fixedCost], tariff);
+  }
+
+  /**
+   * Hours elapsed between session start and `asOf`. The CDR bills TIME over
+   * the full session duration (CdrMapper.calculateTotalTime), so the live
+   * equivalent is start → now.
+   */
+  private elapsedHours(
+    transaction: ITransactionDto,
+    asOf: Date | string,
+  ): number {
+    const start = transaction.startTime ?? transaction.createdAt;
+    if (!start) return 0;
+    const elapsedMs = new Date(asOf).getTime() - new Date(start).getTime();
+    return elapsedMs > 0 ? elapsedMs / 3600000 : 0;
+  }
+
+  /**
+   * `last_updated` must advance on every PATCH or the eMSP discards it as
+   * stale. Transactions.updatedAt does not move when a meter value carries no
+   * energy delta (the TransactionNotify trigger skips no-op updates), so take
+   * whichever of the two timestamps is later.
+   */
+  private getProgressLastUpdated(
+    transaction: ITransactionDto,
+    meterValue: IMeterValueDto,
+  ): string {
+    const candidates = [meterValue.timestamp, transaction.updatedAt]
+      .filter((value): value is Date | string => value != null)
+      .map((value) => new Date(value).getTime())
+      .filter((ms) => !Number.isNaN(ms));
+    const latest = candidates.length ? Math.max(...candidates) : Date.now();
+    return toISOStringIfNeeded(new Date(latest))!;
+  }
+
+  /**
+   * The re-hydrated transaction is fetched over GraphQL right after the insert
+   * that triggered this event, so the triggering meter value is normally
+   * already in `meterValues`. Merge it in defensively: if a read lag ever hid
+   * it, the PATCH would otherwise omit the very period that prompted it.
+   */
+  private withMeterValue(
+    meterValues: IMeterValueDto[] = [],
+    meterValue: IMeterValueDto,
+  ): IMeterValueDto[] {
+    const alreadyPresent = meterValues.some((candidate) =>
+      candidate.id != null && meterValue.id != null
+        ? candidate.id === meterValue.id
+        : new Date(candidate.timestamp).getTime() ===
+          new Date(meterValue.timestamp).getTime(),
+    );
+    return alreadyPresent ? [...meterValues] : [...meterValues, meterValue];
   }
 
   public async getLocationsTokensAndTariffsMapsForTransactions(
@@ -394,7 +550,7 @@ export class SessionMapper extends BaseTransactionMapper {
 
   public getChargingPeriods(
     meterValues: IMeterValueDto[] = [],
-    tariffId: string,
+    tariffId: string | undefined,
   ): ChargingPeriod[] {
     return meterValues
       .sort(
@@ -409,12 +565,17 @@ export class SessionMapper extends BaseTransactionMapper {
           tariffId,
           previousMeterValue,
         );
-      });
+      })
+      // ChargingPeriod.dimensions is 1..* per OCPI 2.2.1 (and min(1) in
+      // ChargingPeriodSchema). The first meter value of a session has no
+      // predecessor to diff the energy register against, so it yields no
+      // dimensions and must not be emitted.
+      .filter((period) => period.dimensions.length > 0);
   }
 
   private mapMeterValueToChargingPeriod(
     meterValue: IMeterValueDto,
-    tariffId: string,
+    tariffId: string | undefined,
     previousMeterValue?: IMeterValueDto,
   ): ChargingPeriod {
     return {

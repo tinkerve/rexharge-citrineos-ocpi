@@ -15,12 +15,10 @@ import { Cdr } from '../model/Cdr';
 import { CdrDimensionType } from '../model/CdrDimensionType';
 import { CdrLocation } from '../model/CdrLocation';
 import { LocationDTO } from '../model/DTO/LocationDTO';
-import { Price } from '../model/Price';
 import { Session } from '../model/Session';
 import { SignedData } from '../model/SignedData';
 import { Tariff as OcpiTariff } from '../model/Tariff';
 import { LocationsService } from '../services/LocationsService';
-import { MINUTES_IN_HOUR } from '../util/Consts';
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 import { BaseTransactionMapper } from './BaseTransactionMapper';
 import { SessionMapper } from './SessionMapper';
@@ -252,45 +250,6 @@ export class CdrMapper extends BaseTransactionMapper {
   }
 
   /**
-   * Flat session fee (OCPI FLAT tariff dimension).
-   * Returns undefined if no per-session fee is configured on the tariff.
-   */
-  private computeFixedCost(tariff: ITariffDto): Price | undefined {
-    if (!tariff.pricePerSession) return undefined;
-    const excl_vat = this.round4(tariff.pricePerSession);
-    return this.buildPrice(excl_vat, tariff.taxRate);
-  }
-
-  /**
-   * Energy cost: kWh consumed × pricePerKwh (OCPI ENERGY tariff dimension).
-   * Returns undefined when the tariff has no energy rate.
-   */
-  private computeEnergyCost(
-    totalKwh: number,
-    tariff: ITariffDto,
-  ): Price | undefined {
-    if (!tariff.pricePerKwh) return undefined;
-    const excl_vat = this.round4(totalKwh * tariff.pricePerKwh);
-    return this.buildPrice(excl_vat, tariff.taxRate);
-  }
-
-  /**
-   * Time cost: session duration in hours × pricePerMin × 60 (OCPI TIME dimension).
-   * TariffMapper stores the TIME price component as pricePerMin*60 (per-hour rate),
-   * so we multiply total_time (hours) by that same per-hour rate here.
-   * Returns undefined when the tariff has no time rate.
-   */
-  private computeTimeCost(
-    totalTimeHours: number,
-    tariff: ITariffDto,
-  ): Price | undefined {
-    if (!tariff.pricePerMin) return undefined;
-    const pricePerHour = tariff.pricePerMin * MINUTES_IN_HOUR;
-    const excl_vat = this.round4(totalTimeHours * pricePerHour);
-    return this.buildPrice(excl_vat, tariff.taxRate);
-  }
-
-  /**
    * Sum PARKING_TIME CdrDimension volumes from charging periods.
    * Per OCPI 2.2.1 spec the volume unit for PARKING_TIME is hours.
    */
@@ -410,35 +369,6 @@ export class CdrMapper extends BaseTransactionMapper {
     }
     const ms = new Date(value).getTime();
     return Number.isNaN(ms) ? undefined : ms;
-  }
-
-  /**
-   * Grand total cost = sum of all non-null cost components.
-   * Includes incl_vat when a taxRate is present on the tariff.
-   */
-  private sumCosts(costs: (Price | undefined)[], tariff: ITariffDto): Price {
-    const excl_vat = costs.reduce(
-      (acc, cost) => acc + (cost?.excl_vat ?? 0),
-      0,
-    );
-    return this.buildPrice(this.round4(excl_vat), tariff.taxRate);
-  }
-
-  /**
-   * Build a Price with optional incl_vat derived from taxRate.
-   */
-  private buildPrice(excl_vat: number, taxRate?: number | null): Price {
-    if (taxRate) {
-      return {
-        excl_vat,
-        incl_vat: this.round4(excl_vat * (1 + taxRate)),
-      };
-    }
-    return { excl_vat };
-  }
-
-  private round4(value: number): number {
-    return Math.round(value * 10000) / 10000;
   }
 
   private calculateTotalTime(session: Session): number {

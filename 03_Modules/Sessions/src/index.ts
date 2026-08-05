@@ -324,9 +324,49 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       await this.broadcastEvseAvailable(fullTransactionDto, fullTransactionDto.endTime!);
       await this.cdrBroadcaster.broadcastPostCdr(fullTransactionDto);
     } else {
-      // Normal in-session update (kwh, charging periods, etc.) — partial DTO is sufficient.
-      await this.sessionBroadcaster.broadcastPatchSession(tenant, transactionDto);
+      // In-session update. The TransactionNotify trigger sends only the columns
+      // that changed plus id/transactionId/tenantId/updatedAt and a tenant
+      // lookup — no Authorization, so this payload can never resolve an eMSP
+      // partner on its own and must be re-hydrated before any broadcast.
+      //
+      // Energy progress is owned by handleMeterValueInsert (which fires per
+      // meter value, including when totalKwh does not move). The only in-session
+      // change this handler still owns is cost movement without a meter value.
+      if (transactionDto.totalCost == null) {
+        this._logger.debug(
+          `In-session update for transaction ${transactionDto.id} carries no cost change; progress PATCH is owned by the meter-value handler`,
+        );
+        return;
+      }
+
+      const fullTransactionDto = await this.fetchTransaction(transactionDto.id!);
+      if (!fullTransactionDto) {
+        this._logger.error(
+          `Full Transaction DTO not found for ID ${transactionDto.id}, cannot broadcast cost update.`,
+        );
+        return;
+      }
+
+      await this.sessionBroadcaster.broadcastPatchSessionCost(
+        tenant,
+        fullTransactionDto,
+      );
     }
+  }
+
+  /**
+   * Re-hydrates a transaction with its relations (Authorization/TenantPartner,
+   * MeterValues, tariff). Notification payloads come from Postgres triggers and
+   * carry flat columns only, so every broadcast path needs this first.
+   */
+  private async fetchTransaction(
+    id: number,
+  ): Promise<ITransactionDto | undefined> {
+    const response = await this.ocpiGraphqlClient.request<
+      GetTransactionByTransactionIdQueryResult,
+      GetTransactionByTransactionIdQueryVariables
+    >(GET_TRANSACTION_BY_ID_QUERY, { id });
+    return response.Transactions[0] as ITransactionDto | undefined;
   }
 
   @AsDtoEventHandler(
@@ -350,13 +390,6 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       this._logger.debug(
         `Meter Value belongs to Transaction: ${meterValueDto.transactionId}`,
       );
-      if (!meterValueDto.tariffId) {
-        this._logger.warn(
-          `Tariff ID missing in Meter Value notification for Transaction ${meterValueDto.transactionId}, cannot broadcast.`,
-        );
-        return;
-      }
-
       // Skip Transaction.Begin meter values to prevent race condition
       const isTransactionBegin =
         await this.isTransactionBeginMeterValue(meterValueDto);
@@ -384,13 +417,20 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       const fullTransactionDto = fullTransactionDtoResponse.Transactions[0] as
         | ITransactionDto
         | undefined;
-      const tenantPartner =
-        fullTransactionDto?.authorization?.tenantPartner ?? undefined;
+      if (!fullTransactionDto) {
+        this._logger.error(
+          `Transaction ${meterValueDto.transactionDatabaseId} not found for meter value ${meterValueDto.id}, cannot broadcast.`,
+        );
+        return;
+      }
 
-      await this.sessionBroadcaster.broadcastPatchSessionChargingPeriod(
+      // This handler owns the in-session progress PATCH: MeterValueNotification
+      // fires on every meter value, whereas TransactionNotification is skipped
+      // when no billable column changed (see TransactionNotify trigger).
+      await this.sessionBroadcaster.broadcastPatchSessionProgress(
         tenant,
+        fullTransactionDto,
         meterValueDto,
-        tenantPartner,
       );
     }
   }

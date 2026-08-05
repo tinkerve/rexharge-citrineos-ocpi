@@ -65,22 +65,53 @@ export class SessionBroadcaster extends BaseBroadcaster {
     );
   }
 
-  async broadcastPatchSessionChargingPeriod(
+  /**
+   * In-session progress PATCH, one per meter value:
+   * { kwh, charging_periods: [<new period>], total_cost, last_updated }.
+   *
+   * Takes the re-hydrated transaction rather than the meter value alone — the
+   * MeterValueNotification payload has no relations, so the energy delta, the
+   * running kwh/cost and the eMSP partner all come from the transaction.
+   */
+  async broadcastPatchSessionProgress(
     tenant: ITenantDto,
+    transactionDto: ITransactionDto,
     meterValueDto: IMeterValueDto,
-    tenantPartner?: ITenantPartnerDto,
   ): Promise<void> {
-    const charging_periods = await this.sessionMapper.getChargingPeriods(
-      [meterValueDto],
-      meterValueDto.tariffId!.toString(),
+    const session = await this.sessionMapper.mapMeterValueToProgressPatch(
+      transactionDto,
+      meterValueDto,
     );
-    const path = `/${tenant.countryCode}/${tenant.partyId}/${meterValueDto.transactionDatabaseId}`;
+    const path = `/${tenant.countryCode}/${tenant.partyId}/${transactionDto.id}`;
     await this.broadcastSession(
       tenant,
-      { charging_periods },
+      session,
       HttpMethod.Patch,
       path,
-      tenantPartner,
+      transactionDto.authorization?.tenantPartner ?? undefined,
+    );
+  }
+
+  /**
+   * Cost-only PATCH: { total_cost, last_updated }. For cost movement with no
+   * new meter value (e.g. per-minute billing while the car sits idle).
+   */
+  async broadcastPatchSessionCost(
+    tenant: ITenantDto,
+    transactionDto: ITransactionDto,
+  ): Promise<void> {
+    const session =
+      await this.sessionMapper.mapTransactionToCostPatch(transactionDto);
+    if (!session) {
+      return;
+    }
+    const path = `/${tenant.countryCode}/${tenant.partyId}/${transactionDto.id}`;
+    await this.broadcastSession(
+      tenant,
+      session,
+      HttpMethod.Patch,
+      path,
+      transactionDto.authorization?.tenantPartner ?? undefined,
     );
   }
 
