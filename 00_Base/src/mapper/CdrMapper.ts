@@ -177,8 +177,11 @@ export class CdrMapper extends BaseTransactionMapper {
     return this.round4(explicitParkingHours + nonChargingHours);
   }
 
+  // session.party_id is our own tenant's party (SessionMapper sets it from
+  // transaction.tenant.partyId), so the CDR id tracks the tenant rather than a
+  // literal. Stays within the OCPI 39-char limit for CDR.id.
   private generateCdrId(session: Session): string {
-    return `CDR**REX**${session.id.padStart(5, '0')}`;
+    return `CDR**${session.party_id}**${session.id.padStart(5, '0')}`;
   }
 
   private async createCdrLocation(
