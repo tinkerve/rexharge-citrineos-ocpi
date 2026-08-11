@@ -272,14 +272,14 @@ export class CredentialsService {
       const newCredentialsDto =
         RegistrationMapper.tenantPartnerToCredentialsDto(tenantPartner);
 
-      await this.ocpiGraphqlClient.request<
-        UpdateTenantPartnerProfileMutationResult,
-        UpdateTenantPartnerProfileMutationVariables
-      >(UPDATE_TENANT_PARTNER_PROFILE, {
-        partnerId: tenantPartner.id!,
-        input: tenantPartner.partnerProfileOCPI!,
-      });
-
+      // OCPI 2.2.1 section 1.1.4: the PUT must be authenticated with the token
+      // the partner previously issued to us (TOKEN_C, held in
+      // partnerProfile.credentials.token). The new token we want them to start
+      // using travels in the body, not the Authorization header. Passing
+      // serverCredentials.token here sent them a token they had never issued,
+      // which they correctly rejected with 401 "Platform not found".
+      //
+      // No overrideToken, so getHeaders() falls back to credentials.token.
       const putCredentialsResponse =
         await this.credentialsClientApi.putCredentials(
           credentialsRequest.role.country_code,
@@ -288,7 +288,6 @@ export class CredentialsService {
           credentialsRequest.mspPartyId,
           tenantPartner.partnerProfileOCPI!,
           newCredentialsDto,
-          tenantPartner.partnerProfileOCPI!.serverCredentials.token,
         );
 
       tenantPartner.partnerProfileOCPI!.credentials = {
@@ -300,6 +299,10 @@ export class CredentialsService {
           RegistrationMapper.toCredentialsRole(value),
         );
 
+      // Single write, only once the partner has accepted and its response has
+      // been parsed. Persisting the rotated token before the call meant a
+      // rejected handshake left us expecting a token the partner had never
+      // received, breaking every inbound request they made.
       await this.ocpiGraphqlClient.request<
         UpdateTenantPartnerProfileMutationResult,
         UpdateTenantPartnerProfileMutationVariables
