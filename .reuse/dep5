@@ -14,3 +14,7 @@ License: Apache-2.0
 Files: .github/workflows/docker-build.yml 00_Base/src/graphql/operations.ts Server/portainer-compose-production.swarm.yml Server/portainer-compose-staging.swarm.yml
 Copyright: Contributors to the CitrineOS Project
 License: Apache-2.0
+
+Files: 00_Base/src/test-fixtures/ocpi-log-sanitizer.v1.json
+Copyright: Contributors to the CitrineOS Project
+License: Apache-2.0
