@@ -44,19 +44,16 @@ export class TokensClientApi extends BaseClientApi {
     partnerProfile: OCPIRegistration.PartnerProfile,
     paginatedParams: PaginatedParams,
   ): Promise<PaginatedTokenResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      PaginatedTokenResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: PaginatedTokenResponseSchema,
       partnerProfile,
-      true,
-      undefined,
-      undefined,
       paginatedParams,
-    );
+    });
   }
 
   async postToken(
@@ -73,19 +70,17 @@ export class TokensClientApi extends BaseClientApi {
     const otherParams: Record<string, string> | undefined = tokenType && {
       type: tokenType,
     };
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Post,
-      AuthorizationInfoResponseSchema,
+      httpMethod: HttpMethod.Post,
+      schema: AuthorizationInfoResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
+      url: `${this.getUrl(partnerProfile)}/${path}`,
       body,
-      undefined,
       otherParams,
-    );
+    });
   }
 }

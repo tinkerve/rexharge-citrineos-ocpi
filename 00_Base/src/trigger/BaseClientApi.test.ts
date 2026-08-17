@@ -99,23 +99,17 @@ describe('BaseClientApi request logging wrapper', () => {
     const client = createClient();
 
     await expect(
-      client.request(
-        'MY',
-        'REX',
-        'SG',
-        'ABC',
-        method,
+      client.request({
+        fromCountryCode: 'MY',
+        fromPartyId: 'REX',
+        toCountryCode: 'SG',
+        toPartyId: 'ABC',
+        httpMethod: method,
         schema,
         partnerProfile,
-        true,
-        undefined,
-        { id: 'location-1' },
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        55,
-      ),
+        body: { id: 'location-1' },
+        locationId: 55,
+      }),
     ).resolves.toEqual({ status_code: 1000 });
 
     expect((client as any).ocpiRequestLogClient.send).toHaveBeenCalledWith(
@@ -138,15 +132,15 @@ describe('BaseClientApi request logging wrapper', () => {
     };
 
     await expect(
-      client.request(
-        'MY',
-        'REX',
-        'SG',
-        'ABC',
-        HttpMethod.Get,
+      client.request({
+        fromCountryCode: 'MY',
+        fromPartyId: 'REX',
+        toCountryCode: 'SG',
+        toPartyId: 'ABC',
+        httpMethod: HttpMethod.Get,
         schema,
         partnerProfile,
-      ),
+      }),
     ).rejects.toMatchObject({ name: 'UnsuccessfulRequestException' });
     expect((client as any).ocpiRequestLogClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -161,15 +155,15 @@ describe('BaseClientApi request logging wrapper', () => {
     const snapshotResponse = jest.spyOn(client as any, 'snapshotResponse');
 
     await expect(
-      client.request(
-        'MY',
-        'REX',
-        'SG',
-        'ABC',
-        HttpMethod.Get,
+      client.request({
+        fromCountryCode: 'MY',
+        fromPartyId: 'REX',
+        toCountryCode: 'SG',
+        toPartyId: 'ABC',
+        httpMethod: HttpMethod.Get,
         schema,
         partnerProfile,
-      ),
+      }),
     ).resolves.toEqual({ status_code: 1000 });
 
     client.response = {
@@ -178,15 +172,15 @@ describe('BaseClientApi request logging wrapper', () => {
       headers: {},
     };
     await expect(
-      client.request(
-        'MY',
-        'REX',
-        'SG',
-        'ABC',
-        HttpMethod.Get,
+      client.request({
+        fromCountryCode: 'MY',
+        fromPartyId: 'REX',
+        toCountryCode: 'SG',
+        toPartyId: 'ABC',
+        httpMethod: HttpMethod.Get,
         schema,
         partnerProfile,
-      ),
+      }),
     ).rejects.toMatchObject({ name: 'UnsuccessfulRequestException' });
 
     expect(snapshotResponse).not.toHaveBeenCalled();
@@ -202,24 +196,21 @@ describe('BaseClientApi request logging wrapper', () => {
     };
 
     await expect(
-      client.request(
-        'MY',
-        'REX',
-        'SG',
-        'ABC',
-        HttpMethod.Get,
+      client.request({
+        fromCountryCode: 'MY',
+        fromPartyId: 'REX',
+        toCountryCode: 'SG',
+        toPartyId: 'ABC',
+        httpMethod: HttpMethod.Get,
         schema,
         partnerProfile,
-        true,
-        undefined,
-        undefined,
-        {
+        paginatedParams: {
           offset: 0,
           limit: 10,
           date_from: '2026-07-01T00:00:00Z',
         },
-        { token: 'query-token' },
-      ),
+        otherParams: { token: 'query-token' },
+      }),
     ).resolves.toEqual({ status_code: 1000 });
 
     expect((client as any).ocpiRequestLogClient.send).toHaveBeenCalledWith(
@@ -266,15 +257,15 @@ describe('BaseClientApi request logging wrapper', () => {
       );
 
       await expect(
-        client.request(
-          'MY',
-          'REX',
-          'SG',
-          'ABC',
-          HttpMethod.Get,
+        client.request({
+          fromCountryCode: 'MY',
+          fromPartyId: 'REX',
+          toCountryCode: 'SG',
+          toPartyId: 'ABC',
+          httpMethod: HttpMethod.Get,
           schema,
           partnerProfile,
-        ),
+        }),
       ).rejects.toMatchObject({ statusCode: 502 });
 
       expect((client as any).ocpiRequestLogClient.send).toHaveBeenCalledWith(
@@ -312,25 +303,22 @@ describe('BaseClientApi request logging wrapper', () => {
         `http://127.0.0.1:${address.port}/ocpi/2.2.1/tokens`,
       );
 
-      await client.request(
-        'MY',
-        'REX',
-        'SG',
-        'ABC',
-        HttpMethod.Post,
+      await client.request({
+        fromCountryCode: 'MY',
+        fromPartyId: 'REX',
+        toCountryCode: 'SG',
+        toPartyId: 'ABC',
+        httpMethod: HttpMethod.Post,
         schema,
         partnerProfile,
-        true,
-        undefined,
-        { uid: 'token-1' },
-        undefined,
-        { type: 'RFID' },
-      );
+        body: { uid: 'token-1' },
+        otherParams: { type: 'RFID' },
+      });
 
       const loggedUrl = (client as any).ocpiRequestLogClient.send.mock
         .calls[0][0].request.url;
-      expect(wireUrl).toBe('/ocpi/2.2.1/tokens');
-      expect(new URL(loggedUrl).search).toBe('');
+      expect(wireUrl).toBe('/ocpi/2.2.1/tokens?type=RFID');
+      expect(new URL(loggedUrl).searchParams.get('type')).toBe('RFID');
     } finally {
       await closeServer(server);
     }
@@ -348,15 +336,15 @@ describe('BaseClientApi request logging wrapper', () => {
       },
     };
 
-    await client.request(
-      'MY',
-      'REX',
-      'SG',
-      'ABC',
-      HttpMethod.Get,
+    await client.request({
+      fromCountryCode: 'MY',
+      fromPartyId: 'REX',
+      toCountryCode: 'SG',
+      toPartyId: 'ABC',
+      httpMethod: HttpMethod.Get,
       schema,
       partnerProfile,
-    );
+    });
 
     expect((client as any).ocpiRequestLogClient.send).toHaveBeenCalledWith(
       expect.objectContaining({

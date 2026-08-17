@@ -48,18 +48,16 @@ export class CdrBroadcaster extends BaseBroadcaster {
         this.logger.debug(
           `CDR ${cdrDto.id} authorized by partner ${tenantPartner.countryCode}_${tenantPartner.partyId}, targeting them only`,
         );
-        await this.cdrsClientApi.request(
-          cdrDto.country_code!,
-          cdrDto.party_id!,
-          tenantPartner.countryCode!,
-          tenantPartner.partyId!,
-          HttpMethod.Post,
-          OcpiEmptyResponseSchema,
-          tenantPartner.partnerProfileOCPI!,
-          true,
-          undefined,
-          cdrDto,
-        );
+        await this.cdrsClientApi.request({
+          fromCountryCode: cdrDto.country_code!,
+          fromPartyId: cdrDto.party_id!,
+          toCountryCode: tenantPartner.countryCode!,
+          toPartyId: tenantPartner.partyId!,
+          httpMethod: HttpMethod.Post,
+          schema: OcpiEmptyResponseSchema,
+          partnerProfile: tenantPartner.partnerProfileOCPI!,
+          body: cdrDto,
+        });
       }
     } catch (e) {
       this.logger.error(`broadcastPostCdr failed for CDR ${cdrDto.id}`, e);

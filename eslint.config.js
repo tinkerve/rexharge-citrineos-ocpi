@@ -39,6 +39,6 @@ module.exports = tseslint.config(
     processor: '@graphql-eslint/graphql',
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', 'citrineos-core/**'],
   },
 );

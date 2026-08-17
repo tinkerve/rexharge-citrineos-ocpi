@@ -4,8 +4,14 @@
 
 import 'reflect-metadata';
 import { createServer, Server } from 'node:http';
+import { Readable } from 'node:stream';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { OcpiConfig } from '../config/ocpi.types';
-import { OcpiRequestLogClient } from './OcpiRequestLogClient';
+import {
+  OcpiRequestLogClient,
+  sanitizeOcpiRequestLogPayload,
+} from './OcpiRequestLogClient';
 
 describe('OcpiRequestLogClient', () => {
   const logger = {
@@ -15,6 +21,33 @@ describe('OcpiRequestLogClient', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     jest.clearAllMocks();
+  });
+
+  it('matches the versioned cross-repository sanitizer fixtures', () => {
+    const fixtures = JSON.parse(
+      readFileSync(
+        resolve(__dirname, '../test-fixtures/ocpi-log-sanitizer.v1.json'),
+        'utf8',
+      ),
+    ) as {
+      cases: Array<{
+        name: string;
+        input: Record<string, unknown>;
+        expected: Record<string, unknown>;
+      }>;
+    };
+
+    for (const fixture of fixtures.cases) {
+      const result = sanitizeOcpiRequestLogPayload({
+        direction: 'INCOMING',
+        request: {
+          method: 'GET',
+          url: '/ocpi',
+          body: fixture.input,
+        },
+      });
+      expect(result.request.body).toEqual(fixture.expected);
+    }
   });
 
   it('does no work when request logging is disabled', async () => {
@@ -206,6 +239,131 @@ describe('OcpiRequestLogClient', () => {
     });
     expect(fetchSpy.mock.calls[0][1]!.body as string).not.toMatch(
       /link-secret|fragment-secret|location-secret|relative-secret|referer-secret|password/,
+    );
+  });
+
+  it('preserves DAG references, redacts credential values, and replaces binary or stream bodies', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(undefined, { status: 202 }));
+    const client = new OcpiRequestLogClient(
+      {
+        requestLog: {
+          enabled: true,
+          gatewayEndpoint: 'http://gateway/ingest',
+          sharedSecret: 'shared-secret',
+          timeoutMs: 100,
+        },
+      } as OcpiConfig,
+      logger,
+    );
+    const shared = { value: 'shared' };
+
+    await client.send({
+      direction: 'OUTGOING',
+      request: {
+        method: 'POST',
+        url: 'https://partner.test/tokens',
+        body: {
+          first: shared,
+          second: shared,
+          endpoint: 'tokens-sender',
+          note: 'upstream replied Bearer secret-value',
+          buffer: Buffer.from('secret bytes'),
+          typed: new Uint8Array([1, 2, 3]),
+        },
+      },
+      response: { body: Readable.from(['stream']) },
+    });
+
+    const event = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+    expect(event.payload.request.body).toEqual({
+      first: { value: 'shared' },
+      second: { value: 'shared' },
+      endpoint: 'tokens-sender',
+      note: 'upstream replied Bearer [REDACTED]',
+      buffer: '[Binary]',
+      typed: '[Binary]',
+    });
+    expect(event.payload.response.body).toBe('[Stream]');
+  });
+
+  it('caps request and response bodies at 256 KiB', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(undefined, { status: 202 }));
+    const client = new OcpiRequestLogClient(
+      {
+        requestLog: {
+          enabled: true,
+          gatewayEndpoint: 'http://gateway/ingest',
+          sharedSecret: 'shared-secret',
+          timeoutMs: 100,
+        },
+      } as OcpiConfig,
+      logger,
+    );
+    const oversized = 'x'.repeat(256 * 1024);
+
+    await client.send({
+      direction: 'INCOMING',
+      request: { method: 'POST', url: '/ocpi', body: oversized },
+      response: { body: { data: oversized } },
+    });
+
+    const event = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+    expect(event.payload.request.body).toEqual({
+      _truncated: true,
+      originalBytes: Buffer.byteLength(JSON.stringify(oversized)),
+    });
+    expect(event.payload.response.body).toEqual({
+      _truncated: true,
+      originalBytes: Buffer.byteLength(JSON.stringify({ data: oversized })),
+    });
+  });
+
+  it('suppresses repeated delivery errors for 60 seconds and resets after success', async () => {
+    let now = 1_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockRejectedValueOnce(new Error('down-1'))
+      .mockRejectedValueOnce(new Error('down-2'))
+      .mockRejectedValueOnce(new Error('down-3'))
+      .mockResolvedValueOnce(new Response(undefined, { status: 202 }))
+      .mockRejectedValueOnce(new Error('down-after-success'));
+    const client = new OcpiRequestLogClient(
+      {
+        requestLog: {
+          enabled: true,
+          gatewayEndpoint: 'http://gateway/ingest',
+          sharedSecret: 'shared-secret',
+          timeoutMs: 100,
+        },
+      } as OcpiConfig,
+      logger,
+    );
+    const payload = {
+      direction: 'INCOMING' as const,
+      request: { method: 'GET', url: '/ocpi' },
+    };
+
+    await client.send(payload);
+    now += 1_000;
+    await client.send(payload);
+    now += 60_000;
+    await client.send(payload);
+    expect(logger.error).toHaveBeenCalledTimes(2);
+    expect(logger.error).toHaveBeenLastCalledWith(
+      expect.stringContaining('Suppressed 1 similar failures'),
+    );
+
+    await client.send(payload);
+    await client.send(payload);
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
+    expect(logger.error).toHaveBeenCalledTimes(3);
+    expect(logger.error).toHaveBeenLastCalledWith(
+      expect.stringContaining('down-after-success'),
     );
   });
 

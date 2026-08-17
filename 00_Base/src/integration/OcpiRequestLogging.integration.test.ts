@@ -214,30 +214,24 @@ describe('OCPI request logging network boundaries', () => {
             : undefined;
 
         await expect(
-          client.request(
-            'MY',
-            'REX',
-            'SG',
-            'ABC',
-            method,
-            responseSchema,
+          client.request({
+            fromCountryCode: 'MY',
+            fromPartyId: 'REX',
+            toCountryCode: 'SG',
+            toPartyId: 'ABC',
+            httpMethod: method,
+            schema: responseSchema,
             partnerProfile,
-            true,
-            undefined,
-            requestBody,
-            undefined,
-            { limit: 10, offset: 5 },
-          ),
+            body: requestBody,
+            otherParams: { limit: 10, offset: 5 },
+          }),
         ).resolves.toEqual({ status_code: 1000 });
 
         const [wireRequest, ingestRequest] = await Promise.all([
           waitFor(partnerCapture.promise, 'partner request'),
           waitFor(ingestCapture.promise, 'request-log ingest'),
         ]);
-        const expectedWireUrl =
-          method === HttpMethod.Get || method === HttpMethod.Delete
-            ? '/ocpi/2.2.1/locations?limit=10&offset=5'
-            : '/ocpi/2.2.1/locations';
+        const expectedWireUrl = '/ocpi/2.2.1/locations?limit=10&offset=5';
         const envelope = ingestRequest.body as any;
 
         expect(wireRequest.method).toBe(method);
@@ -311,15 +305,15 @@ describe('OCPI request logging network boundaries', () => {
       );
 
       await expect(
-        client.request(
-          'MY',
-          'REX',
-          'SG',
-          'ABC',
-          HttpMethod.Get,
-          responseSchema,
+        client.request({
+          fromCountryCode: 'MY',
+          fromPartyId: 'REX',
+          toCountryCode: 'SG',
+          toPartyId: 'ABC',
+          httpMethod: HttpMethod.Get,
+          schema: responseSchema,
           partnerProfile,
-        ),
+        }),
       ).rejects.toMatchObject({ statusCode: 502 });
 
       const ingestRequest = await waitFor(
@@ -384,15 +378,15 @@ describe('OCPI request logging network boundaries', () => {
       );
 
       await expect(
-        client.request(
-          'MY',
-          'REX',
-          'SG',
-          'ABC',
-          HttpMethod.Get,
-          responseSchema,
+        client.request({
+          fromCountryCode: 'MY',
+          fromPartyId: 'REX',
+          toCountryCode: 'SG',
+          toPartyId: 'ABC',
+          httpMethod: HttpMethod.Get,
+          schema: responseSchema,
           partnerProfile,
-        ),
+        }),
       ).resolves.toEqual({ status_code: 1000 });
 
       const ingestRequest = await waitFor(

@@ -66,17 +66,16 @@ export class CommandsClientApi extends BaseClientApi {
       `Cache retrieval after set - commandId: ${commandId}, cachedValue: ${JSON.stringify(cachedValue)}`,
     );
 
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Post,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Post,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
       url,
       body,
-    );
+    });
   }
 }

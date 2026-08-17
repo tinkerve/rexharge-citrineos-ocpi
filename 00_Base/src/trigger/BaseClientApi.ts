@@ -90,6 +90,24 @@ export interface TriggerRequestOptions extends IRequestOptions {
   async?: boolean;
 }
 
+export interface ClientRequestParams<T extends ZodTypeAny> {
+  fromCountryCode: string;
+  fromPartyId: string;
+  toCountryCode: string;
+  toPartyId: string;
+  httpMethod: HttpMethod;
+  schema: T;
+  partnerProfile?: OCPIRegistration.PartnerProfile;
+  routingHeaders?: boolean;
+  url?: string;
+  body?: unknown;
+  paginatedParams?: PaginatedParams;
+  otherParams?: Record<string, string | number | (string | number)[]>;
+  path?: string;
+  overrideToken?: string;
+  locationId?: string | number;
+}
+
 export abstract class BaseClientApi {
   @Inject()
   protected logger!: Logger<ILogObj>;
@@ -133,22 +151,24 @@ export abstract class BaseClientApi {
   }
 
   async request<T extends ZodTypeAny>(
-    fromCountryCode: string,
-    fromPartyId: string,
-    toCountryCode: string,
-    toPartyId: string,
-    httpMethod: HttpMethod,
-    schema: T,
-    partnerProfile?: OCPIRegistration.PartnerProfile,
-    routingHeaders = true,
-    url?: string,
-    body?: any,
-    paginatedParams?: PaginatedParams,
-    otherParams?: Record<string, string | number | (string | number)[]>,
-    path?: string,
-    overrideToken?: string,
-    locationId?: string | number,
+    params: ClientRequestParams<T>,
   ): Promise<any> {
+    const {
+      fromCountryCode,
+      fromPartyId,
+      toCountryCode,
+      toPartyId,
+      httpMethod,
+      schema,
+      routingHeaders = true,
+      body,
+      paginatedParams,
+      otherParams,
+      path,
+      overrideToken,
+      locationId,
+    } = params;
+    let { partnerProfile, url } = params;
     if (!partnerProfile) {
       const response = await this.ocpiGraphqlClient.request<
         GetTenantPartnerByCpoClientAndModuleIdQueryResult,
@@ -204,13 +224,11 @@ export abstract class BaseClientApi {
       }
     }
     options.queryParameters = queryParameters;
-    const effectiveUrl = getRequestUrl(
-      url,
-      undefined,
-      httpMethod === HttpMethod.Get || httpMethod === HttpMethod.Delete
-        ? queryParameters
-        : undefined,
-    );
+    const effectiveUrl = getRequestUrl(url, undefined, queryParameters);
+    // typed-rest-client only applies IRequestOptions.queryParameters to GET/DELETE.
+    // Build the URL once so POST/PUT/PATCH authorization queries are sent and the
+    // captured URL is exactly the URL used on the wire.
+    options.queryParameters = undefined;
     const requestLoggingEnabled = this.ocpiRequestLogClient?.enabled === true;
     const startedAt = Date.now();
     let rawResponse: IRestResponse<unknown> | undefined;
@@ -219,24 +237,24 @@ export abstract class BaseClientApi {
     try {
       switch (httpMethod) {
         case HttpMethod.Get:
-          this.logger.debug(`Sending GET request to ${url}`);
-          rawResponse = await this.getRaw(url, options);
+          this.logger.debug(`Sending GET request to ${effectiveUrl}`);
+          rawResponse = await this.getRaw(effectiveUrl, options);
           break;
         case HttpMethod.Post:
-          this.logger.debug(`Sending POST request to ${url}`, body);
-          rawResponse = await this.createRaw(url, body, options);
+          this.logger.debug(`Sending POST request to ${effectiveUrl}`, body);
+          rawResponse = await this.createRaw(effectiveUrl, body, options);
           break;
         case HttpMethod.Put:
-          this.logger.debug(`Sending PUT request to ${url}`, body);
-          rawResponse = await this.replaceRaw(url, body, options);
+          this.logger.debug(`Sending PUT request to ${effectiveUrl}`, body);
+          rawResponse = await this.replaceRaw(effectiveUrl, body, options);
           break;
         case HttpMethod.Patch:
-          this.logger.debug(`Sending PATCH request to ${url}`, body);
-          rawResponse = await this.updateRaw(url, body, options);
+          this.logger.debug(`Sending PATCH request to ${effectiveUrl}`, body);
+          rawResponse = await this.updateRaw(effectiveUrl, body, options);
           break;
         case HttpMethod.Delete:
-          this.logger.debug(`Sending DELETE request to ${url}`);
-          rawResponse = await this.delRaw(url, options);
+          this.logger.debug(`Sending DELETE request to ${effectiveUrl}`);
+          rawResponse = await this.delRaw(effectiveUrl, options);
           break;
       }
 
@@ -438,23 +456,22 @@ export abstract class BaseClientApi {
         `Broadcasting partner ${partner.countryCode}_${partner.partyId}`,
       );
       try {
-        const partnerResponse = await this.request(
-          cpoCountryCode,
-          cpoPartyId,
-          partner.countryCode!,
-          partner.partyId!,
+        const partnerResponse = await this.request({
+          fromCountryCode: cpoCountryCode,
+          fromPartyId: cpoPartyId,
+          toCountryCode: partner.countryCode!,
+          toPartyId: partner.partyId!,
           httpMethod,
           schema,
-          partner.partnerProfileOCPI!,
+          partnerProfile: partner.partnerProfileOCPI!,
           routingHeaders,
           url,
           body,
           paginatedParams,
           otherParams,
           path,
-          undefined,
           locationId,
-        );
+        });
         successes.push({ partner, response: partnerResponse });
         this.logger.debug(
           `Successfully Broadcasted partner ${partner.countryCode}_${partner.partyId}`,

@@ -8,7 +8,13 @@ import { OcpiConfig, OcpiConfigToken } from '../config/ocpi.types';
 import { OcpiRequestLogPayload } from '../types/ocpi-request-log.types';
 
 const REDACTED = '[REDACTED]';
+// Keep 00_Base/src/test-fixtures/ocpi-log-sanitizer.v1.json in sync with the
+// Gateway fixture at test/fixtures/ocpi-log-sanitizer.v1.json.
 const CIRCULAR = '[Circular]';
+const BINARY = '[Binary]';
+const STREAM = '[Stream]';
+export const OCPI_REQUEST_LOG_BODY_LIMIT_BYTES = 256 * 1024;
+const FAILURE_LOG_INTERVAL_MS = 60_000;
 const SENSITIVE_KEYS = new Set([
   'apikey',
   'authorization',
@@ -61,7 +67,7 @@ function isSensitiveKey(key: string): boolean {
 function sanitizeUrl(value: string): string {
   try {
     const isRelative = value.startsWith('/');
-    if (!isRelative && !/^https?:\/\//i.test(value)) return REDACTED;
+    if (!isRelative && !/^https?:\/\//i.test(value)) return value;
 
     const url = new URL(value, 'http://internal.invalid');
     url.username = '';
@@ -95,6 +101,10 @@ function sanitizeUrl(value: string): string {
   }
 }
 
+function redactCredentialValues(value: string): string {
+  return value.replace(/\b(Bearer|Token|Basic)\s+[^\s,;]+/gi, '$1 [REDACTED]');
+}
+
 function sanitizeLinkHeader(value: string): string {
   return value.replace(/<([^>]*)>/g, (_match, rawUrl: string) => {
     return `<${sanitizeUrl(rawUrl)}>`;
@@ -106,11 +116,27 @@ function sanitizeLeaf(value: unknown, key?: string): unknown {
   if (key && isSensitiveKey(key)) return REDACTED;
   if (value instanceof Date) return value.toJSON();
   if (
-    typeof value === 'string' &&
+    Buffer.isBuffer(value) ||
+    ArrayBuffer.isView(value) ||
+    value instanceof ArrayBuffer
+  )
+    return BINARY;
+  if (
+    value &&
+    typeof value === 'object' &&
+    (typeof (value as { pipe?: unknown }).pipe === 'function' ||
+      typeof (value as { getReader?: unknown }).getReader === 'function')
+  ) {
+    return STREAM;
+  }
+  const stringValue =
+    typeof value === 'string' ? redactCredentialValues(value) : value;
+  if (
+    typeof stringValue === 'string' &&
     normalizedKey &&
     LINK_KEYS.has(normalizedKey)
   ) {
-    return sanitizeLinkHeader(value);
+    return sanitizeLinkHeader(stringValue);
   }
   const isUrlKey =
     normalizedKey &&
@@ -118,45 +144,57 @@ function sanitizeLeaf(value: unknown, key?: string): unknown {
       normalizedKey.endsWith('url') ||
       normalizedKey.endsWith('uri') ||
       normalizedKey.endsWith('endpoint'));
-  if (typeof value === 'string' && isUrlKey) {
-    return sanitizeUrl(value);
+  if (typeof stringValue === 'string' && isUrlKey) {
+    return sanitizeUrl(stringValue);
   }
-  return value;
+  return stringValue;
+}
+
+interface AncestorNode {
+  value: object;
+  parent?: AncestorNode;
+}
+
+function isAncestor(value: object, ancestor?: AncestorNode): boolean {
+  for (let current = ancestor; current; current = current.parent) {
+    if (current.value === value) return true;
+  }
+  return false;
 }
 
 function sanitize(value: unknown): unknown {
-  if (!value || typeof value !== 'object') return value;
+  const leaf = sanitizeLeaf(value);
+  if (leaf !== value || !value || typeof value !== 'object') return leaf;
 
   const root: Record<string, unknown> | unknown[] = Array.isArray(value)
     ? []
     : {};
-  const seen = new WeakSet<object>([value]);
   const pending: Array<{
     source: Record<string, unknown> | unknown[];
     target: Record<string, unknown> | unknown[];
     arrayItemKey?: string;
+    ancestors: AncestorNode;
   }> = [
     {
       source: value as Record<string, unknown> | unknown[],
       target: root,
+      ancestors: { value },
     },
   ];
 
   while (pending.length > 0) {
-    const { source, target, arrayItemKey } = pending.pop()!;
+    const { source, target, arrayItemKey, ancestors } = pending.pop()!;
     for (const [key, rawValue] of Object.entries(source)) {
-      const effectiveKey = Array.isArray(source) ? arrayItemKey : key;
-      const sanitized = sanitizeLeaf(rawValue, effectiveKey);
+      const semanticKey = Array.isArray(source) ? arrayItemKey : key;
+      const sanitized = sanitizeLeaf(rawValue, semanticKey);
       if (sanitized !== rawValue || !rawValue || typeof rawValue !== 'object') {
         (target as any)[key] = sanitized;
         continue;
       }
-
-      if (seen.has(rawValue)) {
+      if (isAncestor(rawValue, ancestors)) {
         (target as any)[key] = CIRCULAR;
         continue;
       }
-      seen.add(rawValue);
 
       const childTarget: Record<string, unknown> | unknown[] = Array.isArray(
         rawValue,
@@ -167,16 +205,38 @@ function sanitize(value: unknown): unknown {
       pending.push({
         source: rawValue as Record<string, unknown> | unknown[],
         target: childTarget,
-        arrayItemKey: Array.isArray(rawValue) ? effectiveKey : undefined,
+        arrayItemKey: Array.isArray(rawValue) ? semanticKey : undefined,
+        ancestors: { value: rawValue, parent: ancestors },
       });
     }
   }
-
   return root;
+}
+
+function capBody(value: unknown): unknown {
+  const serialized = JSON.stringify(value);
+  const originalBytes =
+    serialized === undefined ? 0 : Buffer.byteLength(serialized, 'utf8');
+  return originalBytes > OCPI_REQUEST_LOG_BODY_LIMIT_BYTES
+    ? { _truncated: true, originalBytes }
+    : value;
+}
+
+export function sanitizeOcpiRequestLogPayload(
+  payload: OcpiRequestLogPayload,
+): OcpiRequestLogPayload {
+  const sanitized = sanitize(payload) as OcpiRequestLogPayload;
+  sanitized.request.body = capBody(sanitized.request.body);
+  if (sanitized.response)
+    sanitized.response.body = capBody(sanitized.response.body);
+  return sanitized;
 }
 
 @Service()
 export class OcpiRequestLogClient {
+  private lastFailureLogAt?: number;
+  private suppressedFailureCount = 0;
+
   constructor(
     @Inject(OcpiConfigToken) private readonly config: OcpiConfig,
     @Inject() private readonly logger: Logger<ILogObj>,
@@ -192,7 +252,7 @@ export class OcpiRequestLogClient {
     if (!enabled) return;
 
     if (!gatewayEndpoint || !sharedSecret) {
-      this.logger.error(
+      this.logForwardingFailure(
         'OCPI request logging is enabled but Gateway endpoint or shared secret is missing.',
       );
       return;
@@ -209,21 +269,49 @@ export class OcpiRequestLogClient {
           'content-type': 'application/json',
           'x-ocpi-log-secret': sharedSecret,
         },
-        body: JSON.stringify({ payload: sanitize(payload) }),
+        body: JSON.stringify({
+          payload: sanitizeOcpiRequestLogPayload(payload),
+        }),
         signal: controller.signal,
       });
 
       if (!response.ok) {
-        this.logger.error(
+        this.logForwardingFailure(
           `Gateway rejected OCPI request log with HTTP ${response.status}.`,
         );
+      } else {
+        this.resetFailureLogging();
       }
       await response.body?.cancel();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to forward OCPI request log: ${message}`);
+      this.logForwardingFailure(
+        `Failed to forward OCPI request log: ${message}`,
+      );
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private logForwardingFailure(message: string): void {
+    const now = Date.now();
+    if (
+      this.lastFailureLogAt === undefined ||
+      now - this.lastFailureLogAt >= FAILURE_LOG_INTERVAL_MS
+    ) {
+      const suppressed = this.suppressedFailureCount;
+      this.logger.error(
+        `${message}${suppressed > 0 ? ` Suppressed ${suppressed} similar failures.` : ''}`,
+      );
+      this.lastFailureLogAt = now;
+      this.suppressedFailureCount = 0;
+      return;
+    }
+    this.suppressedFailureCount += 1;
+  }
+
+  private resetFailureLogging(): void {
+    this.lastFailureLogAt = undefined;
+    this.suppressedFailureCount = 0;
   }
 }
