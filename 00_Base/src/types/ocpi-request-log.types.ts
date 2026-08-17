@@ -15,6 +15,7 @@ export interface OcpiRequestLogPayload {
     headers?: Record<string, unknown>;
     body?: unknown;
   };
+  ocpiStatusCode?: number;
   error?: {
     name?: string;
     message?: string;

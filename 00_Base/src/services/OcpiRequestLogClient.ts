@@ -222,10 +222,35 @@ function capBody(value: unknown): unknown {
     : value;
 }
 
+function extractOcpiStatusCode(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const body = value as Record<string, unknown>;
+  let rawStatus: unknown;
+  try {
+    rawStatus = body.status_code ?? body.statusCode;
+  } catch {
+    return undefined;
+  }
+  const status =
+    typeof rawStatus === 'number'
+      ? rawStatus
+      : typeof rawStatus === 'string'
+        ? Number(rawStatus)
+        : Number.NaN;
+  return Number.isInteger(status) && status >= 1000 && status <= 4999
+    ? status
+    : undefined;
+}
+
 export function sanitizeOcpiRequestLogPayload(
   payload: OcpiRequestLogPayload,
 ): OcpiRequestLogPayload {
+  const ocpiStatusCode = extractOcpiStatusCode(payload.response?.body);
   const sanitized = sanitize(payload) as OcpiRequestLogPayload;
+  if (ocpiStatusCode !== undefined) sanitized.ocpiStatusCode = ocpiStatusCode;
   sanitized.request.body = capBody(sanitized.request.body);
   if (sanitized.response)
     sanitized.response.body = capBody(sanitized.response.body);

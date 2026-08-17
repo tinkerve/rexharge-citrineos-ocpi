@@ -308,7 +308,7 @@ describe('OcpiRequestLogClient', () => {
     await client.send({
       direction: 'INCOMING',
       request: { method: 'POST', url: '/ocpi', body: oversized },
-      response: { body: { data: oversized } },
+      response: { body: { status_code: 2001, data: oversized } },
     });
 
     const event = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
@@ -318,8 +318,11 @@ describe('OcpiRequestLogClient', () => {
     });
     expect(event.payload.response.body).toEqual({
       _truncated: true,
-      originalBytes: Buffer.byteLength(JSON.stringify({ data: oversized })),
+      originalBytes: Buffer.byteLength(
+        JSON.stringify({ status_code: 2001, data: oversized }),
+      ),
     });
+    expect(event.payload.ocpiStatusCode).toBe(2001);
   });
 
   it('suppresses repeated delivery errors for 60 seconds and resets after success', async () => {
