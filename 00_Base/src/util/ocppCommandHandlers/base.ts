@@ -133,10 +133,12 @@ export abstract class OCPPCommandHandler {
         responseUrl,
         {
           result: CommandResultType.FAILED,
-          message: {
-            language: 'en',
-            text: 'Charging station communication failed',
-          },
+          message: [
+            {
+              language: 'en',
+              text: 'Charging station communication failed',
+            },
+          ],
         },
         commandId,
       );

@@ -16,7 +16,7 @@ export enum CommandResponseType {
 export const CommandResponseSchema = z.object({
   result: z.nativeEnum(CommandResponseType),
   timeout: z.number().int().min(0),
-  message: DisplayTextSchema.optional(),
+  message: z.array(DisplayTextSchema).optional(),
 });
 export const CommandResponseSchemaName = 'CommandResponse';
 

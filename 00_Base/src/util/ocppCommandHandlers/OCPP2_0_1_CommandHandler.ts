@@ -178,10 +178,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           unlockConnector.response_url,
           {
             result: CommandResultType.FAILED,
-            message: {
-              language: 'en',
-              text: 'Charging station communication failed',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station communication failed',
+              },
+            ],
           },
           commandId,
         )
@@ -262,10 +264,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.ACCEPTED,
-            message: {
-              language: 'en',
-              text: 'Charging station start session successful',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station start session successful',
+              },
+            ],
           },
           commandId,
         );
@@ -283,10 +287,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.EVSE_OCCUPIED,
-            message: {
-              language: 'en',
-              text: 'Charging station already in use',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station already in use',
+              },
+            ],
           },
           commandId,
         );
@@ -318,10 +324,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.ACCEPTED,
-            message: {
-              language: 'en',
-              text: 'Charging station stop session successful',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station stop session successful',
+              },
+            ],
           },
           commandId,
         );
@@ -339,10 +347,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.REJECTED,
-            message: {
-              language: 'en',
-              text: 'Charging station rejected stop session',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station rejected stop session',
+              },
+            ],
           },
           commandId,
         );
@@ -373,10 +383,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.ACCEPTED,
-            message: {
-              language: 'en',
-              text: 'Charging station unlock connector successful',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station unlock connector successful',
+              },
+            ],
           },
           commandId,
         );
@@ -394,10 +406,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.EVSE_OCCUPIED,
-            message: {
-              language: 'en',
-              text: 'Charging station already in use',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station already in use',
+              },
+            ],
           },
           commandId,
         );
@@ -415,10 +429,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.REJECTED,
-            message: {
-              language: 'en',
-              text: 'Charging station unknown connector',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station unknown connector',
+              },
+            ],
           },
           commandId,
         );
@@ -436,10 +452,12 @@ export class OCPP2_0_1_CommandHandler extends OCPPCommandHandler {
           responseUrl,
           {
             result: CommandResultType.FAILED,
-            message: {
-              language: 'en',
-              text: 'Charging station unlock connector failed',
-            },
+            message: [
+              {
+                language: 'en',
+                text: 'Charging station unlock connector failed',
+              },
+            ],
           },
           commandId,
         );

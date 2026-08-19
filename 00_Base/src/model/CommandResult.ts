@@ -20,7 +20,7 @@ export enum CommandResultType {
 
 export const CommandResultSchema = z.object({
   result: z.nativeEnum(CommandResultType),
-  message: DisplayTextSchema.optional(),
+  message: z.array(DisplayTextSchema).optional(),
 });
 
 export type CommandResult = z.infer<typeof CommandResultSchema>;
