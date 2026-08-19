@@ -132,7 +132,7 @@ export class SessionMapper extends BaseTransactionMapper {
     const tariff = tariffMap.get(transaction.id!.toString());
 
     const session: Partial<Session> = {
-      kwh: transaction.totalKwh || 0,
+      kwh: this.roundKwh(transaction.totalKwh || 0),
       last_updated: this.getProgressLastUpdated(transaction, meterValue),
     };
 
@@ -147,6 +147,7 @@ export class SessionMapper extends BaseTransactionMapper {
     const periods = this.getChargingPeriods(
       this.withMeterValue(transaction.meterValues, meterValue),
       tariff ? String(tariff.id) : undefined,
+      transaction,
     );
     if (periods.length > 0) {
       session.charging_periods = periods;
@@ -229,6 +230,48 @@ export class SessionMapper extends BaseTransactionMapper {
    * energy delta (the TransactionNotify trigger skips no-op updates), so take
    * whichever of the two timestamps is later.
    */
+  /**
+   * `last_updated` for a whole-session restatement. Transactions.updatedAt is
+   * not enough on its own: the closing PATCH is built from the event payload
+   * after the unplug, so it can carry an updatedAt no newer than the PATCH
+   * before it. Our own eMSP discards any PATCH whose last_updated is not newer
+   * than what it stored (SessionsService.patchSession), which silently loses
+   * the COMPLETED status and leaves the session ACTIVE forever.
+   *
+   * So take the latest timestamp the session actually knows about.
+   */
+  private getSessionLastUpdated(transaction: Partial<ITransactionDto>): string {
+    const latestMeterValue = (transaction.meterValues ?? []).reduce<
+      string | Date | undefined
+    >(
+      (latest, meterValue) =>
+        latest == null ||
+        new Date(meterValue.timestamp).getTime() > new Date(latest).getTime()
+          ? meterValue.timestamp
+          : latest,
+      undefined,
+    );
+
+    return this.latestTimestamp([
+      transaction.updatedAt,
+      transaction.endTime,
+      this.getSessionEndDateTime(transaction),
+      transaction.stopTransaction?.timestamp,
+      latestMeterValue,
+    ]);
+  }
+
+  private latestTimestamp(
+    candidates: Array<string | Date | null | undefined>,
+  ): string {
+    const times = candidates
+      .filter((value): value is string | Date => value != null)
+      .map((value) => new Date(value).getTime())
+      .filter((ms) => !Number.isNaN(ms));
+    const latest = times.length ? Math.max(...times) : Date.now();
+    return toISOStringIfNeeded(new Date(latest), true)!;
+  }
+
   private getProgressLastUpdated(
     transaction: ITransactionDto,
     meterValue: IMeterValueDto,
@@ -346,11 +389,11 @@ export class SessionMapper extends BaseTransactionMapper {
     }
 
     if (transaction.totalKwh !== undefined) {
-      session.kwh = transaction.totalKwh || 0;
+      session.kwh = this.roundKwh(transaction.totalKwh || 0);
     }
 
     if (transaction.updatedAt !== undefined) {
-      session.last_updated = toISOStringIfNeeded(transaction.updatedAt);
+      session.last_updated = this.getSessionLastUpdated(transaction);
     }
 
     // Map context-dependent fields if available
@@ -389,6 +432,7 @@ export class SessionMapper extends BaseTransactionMapper {
       session.charging_periods = this.getChargingPeriods(
         transaction.meterValues,
         String(tariff.id),
+        transaction,
       );
     }
 
@@ -433,11 +477,11 @@ export class SessionMapper extends BaseTransactionMapper {
     }
 
     if (transaction.totalKwh !== undefined) {
-      session.kwh = transaction.totalKwh || 0;
+      session.kwh = this.roundKwh(transaction.totalKwh || 0);
     }
 
     if (transaction.updatedAt !== undefined) {
-      session.last_updated = toISOStringIfNeeded(transaction.updatedAt);
+      session.last_updated = this.getSessionLastUpdated(transaction);
     }
 
     if (transaction.evseId && transaction.stationId) {
@@ -482,7 +526,7 @@ export class SessionMapper extends BaseTransactionMapper {
             return toISOStringIfNeeded(transaction.createdAt!, true);
           })(),
       end_date_time: this.getSessionEndDateTime(transaction),
-      kwh: transaction.totalKwh || 0,
+      kwh: this.roundKwh(transaction.totalKwh || 0),
       cdr_token: this.createCdrToken(token),
       // TODO: Implement other auth methods
       auth_method: AuthMethod.WHITELIST,
@@ -493,9 +537,10 @@ export class SessionMapper extends BaseTransactionMapper {
       charging_periods: this.getChargingPeriods(
         transaction.meterValues,
         String(tariff?.id),
+        transaction,
       ),
       status: this.getTransactionStatus(transaction),
-      last_updated: toISOStringIfNeeded(transaction.updatedAt!, true),
+      last_updated: this.getSessionLastUpdated(transaction),
       authorization_reference: transaction.customData
         ? transaction.customData?.authorization_reference
         : null,
@@ -548,38 +593,135 @@ export class SessionMapper extends BaseTransactionMapper {
     }
   }
 
+  /**
+   * The periods must reconcile: OCPI 2.2.1 exists them so the eMSP "can
+   * calculate and verify the total cost", so their ENERGY volumes have to sum
+   * to the session's `kwh`.
+   *
+   * Sampled meter values alone cannot do that. `kwh` is `meterStop -
+   * meterStart`, while consecutive-sample deltas only cover the span between
+   * the first and last sample — the energy before the first sample and after
+   * the last one belongs to no period. On a real session (5 samples, 60s apart)
+   * that lost 0.11 of 0.42 kWh, 26%, and the eMSP's cost check failed.
+   *
+   * So bracket the sampled periods with the two register boundaries:
+   * `meterStart -> first sample` and `last sample -> meterStop`. Both come from
+   * the OCPP 1.6 Start/StopTransaction registers in Wh; when they are absent
+   * (2.0.1 has no such messages, and a live session has no meterStop yet) the
+   * boundary is simply skipped and the sampled periods stand alone.
+   */
   public getChargingPeriods(
     meterValues: IMeterValueDto[] = [],
     tariffId: string | undefined,
+    transaction?: Partial<ITransactionDto>,
   ): ChargingPeriod[] {
-    return meterValues
-      .sort(
-        (a, b) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-      )
-      .map((meterValue, index, sortedMeterValues) => {
-        const previousMeterValue =
-          index > 0 ? sortedMeterValues[index - 1] : undefined;
-        return this.mapMeterValueToChargingPeriod(
+    const sortedMeterValues = [...meterValues].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
+
+    const sampledPeriods = sortedMeterValues
+      .map((meterValue, index) =>
+        this.mapMeterValueToChargingPeriod(
           meterValue,
           tariffId,
-          previousMeterValue,
-        );
-      })
+          index > 0 ? sortedMeterValues[index - 1] : undefined,
+        ),
+      )
       // ChargingPeriod.dimensions is 1..* per OCPI 2.2.1 (and min(1) in
       // ChargingPeriodSchema). The first meter value of a session has no
       // predecessor to diff the energy register against, so it yields no
       // dimensions and must not be emitted.
       .filter((period) => period.dimensions.length > 0);
+
+    const firstMeterValue = sortedMeterValues[0];
+    const lastMeterValue = sortedMeterValues[sortedMeterValues.length - 1];
+
+    const openingPeriod = this.buildBoundaryPeriod(
+      this.getSessionStartTimestamp(transaction),
+      transaction?.startTransaction?.meterStart,
+      this.getEnergyImportWh(firstMeterValue),
+      tariffId,
+    );
+    const closingPeriod = this.buildBoundaryPeriod(
+      lastMeterValue?.timestamp,
+      this.getEnergyImportWh(lastMeterValue),
+      transaction?.stopTransaction?.meterStop,
+      tariffId,
+    );
+
+    return [
+      ...(openingPeriod ? [openingPeriod] : []),
+      ...sampledPeriods,
+      ...(closingPeriod ? [closingPeriod] : []),
+    ];
   }
 
+  /**
+   * One period covering `fromWh -> toWh`, stamped at `startTimestamp`. Returns
+   * undefined unless both registers and the timestamp are usable and the delta
+   * is positive — a zero or negative boundary is noise, not a charging period.
+   */
+  private buildBoundaryPeriod(
+    startTimestamp: string | Date | undefined | null,
+    fromWh: number | undefined,
+    toWh: number | undefined,
+    tariffId: string | undefined,
+  ): ChargingPeriod | undefined {
+    if (startTimestamp == null || fromWh === undefined || toWh === undefined) {
+      return undefined;
+    }
+    const volume = this.roundKwh((toWh - fromWh) / 1000);
+    if (!Number.isFinite(volume) || volume <= 0) return undefined;
+
+    const startDateTime = toISOStringIfNeeded(startTimestamp, true);
+    if (!startDateTime) return undefined;
+
+    return {
+      start_date_time: startDateTime,
+      dimensions: [{ type: CdrDimensionType.ENERGY, volume }],
+      tariff_id: tariffId,
+    };
+  }
+
+  private getSessionStartTimestamp(
+    transaction?: Partial<ITransactionDto>,
+  ): string | Date | undefined | null {
+    return transaction?.startTime ?? transaction?.startTransaction?.timestamp;
+  }
+
+  /**
+   * The energy register of a meter value, normalised to Wh so it can be
+   * compared against meterStart/meterStop, which OCPP 1.6 always reports in Wh.
+   */
+  private getEnergyImportWh(meterValue?: IMeterValueDto): number | undefined {
+    const sample = this.getEnergyImportSample(meterValue);
+    if (!sample || isNaN(Number(sample.value))) return undefined;
+    return (
+      this.convertToKwh(
+        Number(sample.value),
+        (sample as any).unit ?? (sample as any).unitOfMeasure?.unit,
+      ) * 1000
+    );
+  }
+
+  /**
+   * A ChargingPeriod's `start_date_time` is the start of the interval it
+   * describes — OCPI 2.2.1 has a period run until the next one begins. The
+   * energy here is the register delta from `previousMeterValue` to
+   * `meterValue`, so the interval starts at the *previous* reading. Stamping it
+   * with `meterValue.timestamp` shifted every period one sample late.
+   */
   private mapMeterValueToChargingPeriod(
     meterValue: IMeterValueDto,
     tariffId: string | undefined,
     previousMeterValue?: IMeterValueDto,
   ): ChargingPeriod {
     return {
-      start_date_time: toISOStringIfNeeded(meterValue.timestamp, true),
+      start_date_time: toISOStringIfNeeded(
+        (previousMeterValue ?? meterValue).timestamp,
+        true,
+      ),
       dimensions: this.getCdrDimensions(meterValue, previousMeterValue),
       tariff_id: tariffId,
     };
@@ -607,7 +749,13 @@ export class SessionMapper extends BaseTransactionMapper {
             Number(sampledValue.value) - Number(previousEnergyImport);
           cdrDimensions.push({
             type: CdrDimensionType.ENERGY,
-            volume: this.convertToKwh(energyDelta, (sampledValue as any).unit ?? (sampledValue as any).unitOfMeasure?.unit),
+            volume: this.roundKwh(
+              this.convertToKwh(
+                energyDelta,
+                (sampledValue as any).unit ??
+                  (sampledValue as any).unitOfMeasure?.unit,
+              ),
+            ),
           });
         }
       }
@@ -628,21 +776,35 @@ export class SessionMapper extends BaseTransactionMapper {
   }
 
   private getEnergyImportForMeterValue(meterValue?: IMeterValueDto) {
-    return (
-      meterValue?.sampledValue.find(
-        (sampledValue) =>
-          sampledValue.measurand ===
-            OCPP2_0_1.MeasurandEnumType.Energy_Active_Import_Register &&
-          !sampledValue.phase,
-      )?.value ?? undefined
+    return this.getEnergyImportSample(meterValue)?.value ?? undefined;
+  }
+
+  private getEnergyImportSample(meterValue?: IMeterValueDto) {
+    return meterValue?.sampledValue.find(
+      (sampledValue) =>
+        sampledValue.measurand ===
+          OCPP2_0_1.MeasurandEnumType.Energy_Active_Import_Register &&
+        !sampledValue.phase,
     );
   }
 
+  /**
+   * Meter registers are integers in Wh, so kWh needs no more than three
+   * decimals. Rounding at four keeps headroom for finer meters while keeping
+   * float accumulator noise (0.19000000000005457) out of a partner's billing
+   * input.
+   */
+  private roundKwh(value: number): number {
+    return Math.round(value * 10000) / 10000;
+  }
 
-  private getSessionEndDateTime(transaction: Partial<ITransactionDto>): string | null {
+  private getSessionEndDateTime(
+    transaction: Partial<ITransactionDto>,
+  ): string | null {
     if (!transaction.endTime) return null;
     // Physical disconnect: endTime IS the unplug time (both OCPP 1.6 and 2.0.1)
-    if (transaction.stoppedReason === 'EVDisconnected') return toISOStringIfNeeded(transaction.endTime) ?? null;
+    if (transaction.stoppedReason === 'EVDisconnected')
+      return toISOStringIfNeeded(transaction.endTime) ?? null;
     // All other stops: session ends when the car physically disconnects (Available → unplugTime)
     const unplugTime = transaction.customData?.unplugTime;
     if (unplugTime) return toISOStringIfNeeded(unplugTime) ?? null;
@@ -652,7 +814,8 @@ export class SessionMapper extends BaseTransactionMapper {
 
   private getTransactionStatus(transaction: ITransactionDto): SessionStatus {
     if (!transaction.endTime) return SessionStatus.ACTIVE;
-    if (transaction.stoppedReason === 'EVDisconnected') return SessionStatus.COMPLETED;
+    if (transaction.stoppedReason === 'EVDisconnected')
+      return SessionStatus.COMPLETED;
     if (transaction.customData?.unplugTime) return SessionStatus.COMPLETED;
     // Charging stopped but car still connected (parking) — session still active
     return SessionStatus.ACTIVE;

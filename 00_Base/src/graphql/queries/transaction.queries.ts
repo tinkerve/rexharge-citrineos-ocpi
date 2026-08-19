@@ -51,9 +51,11 @@ export const GET_TRANSACTIONS_QUERY = gql`
       }
       startTransaction: StartTransaction {
         timestamp
+        meterStart
       }
       stopTransaction: StopTransaction {
         timestamp
+        meterStop
       }
       meterValues: MeterValues {
         timestamp
@@ -142,9 +144,11 @@ export const GET_RECENTLY_ENDED_TRANSACTION_BY_EVSE_QUERY = gql`
       }
       startTransaction: StartTransaction {
         timestamp
+        meterStart
       }
       stopTransaction: StopTransaction {
         timestamp
+        meterStop
       }
       meterValues: MeterValues {
         timestamp
@@ -211,9 +215,11 @@ export const GET_TRANSACTION_BY_ID_QUERY = gql`
       }
       startTransaction: StartTransaction {
         timestamp
+        meterStart
       }
       stopTransaction: StopTransaction {
         timestamp
+        meterStop
       }
       meterValues: MeterValues {
         timestamp

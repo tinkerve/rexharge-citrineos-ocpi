@@ -872,9 +872,11 @@ export type GetTransactionsQueryResult = {
     }>;
     startTransaction?: {
       timestamp?: any | null;
+      meterStart?: number | null;
     } | null;
     stopTransaction?: {
       timestamp?: any | null;
+      meterStop?: number | null;
     } | null;
     meterValues: Array<{
       timestamp?: any | null;
@@ -957,9 +959,11 @@ export type GetRecentlyEndedTransactionByEvseQueryResult = {
     }>;
     startTransaction?: {
       timestamp?: any | null;
+      meterStart?: number | null;
     } | null;
     stopTransaction?: {
       timestamp?: any | null;
+      meterStop?: number | null;
     } | null;
     meterValues: Array<{
       timestamp?: any | null;
@@ -1028,9 +1032,11 @@ export type GetTransactionByTransactionIdQueryResult = {
     }>;
     startTransaction?: {
       timestamp?: any | null;
+      meterStart?: number | null;
     } | null;
     stopTransaction?: {
       timestamp?: any | null;
+      meterStop?: number | null;
     } | null;
     meterValues: Array<{
       timestamp?: any | null;
