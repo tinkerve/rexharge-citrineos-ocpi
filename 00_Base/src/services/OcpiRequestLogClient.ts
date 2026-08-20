@@ -111,24 +111,29 @@ function sanitizeLinkHeader(value: string): string {
   });
 }
 
+function isBinary(value: unknown): boolean {
+  return (
+    Buffer.isBuffer(value) ||
+    ArrayBuffer.isView(value) ||
+    value instanceof ArrayBuffer
+  );
+}
+
+function isStream(value: unknown): boolean {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    (typeof (value as { pipe?: unknown }).pipe === 'function' ||
+      typeof (value as { getReader?: unknown }).getReader === 'function'),
+  );
+}
+
 function sanitizeLeaf(value: unknown, key?: string): unknown {
   const normalizedKey = key ? normalizeKey(key) : undefined;
   if (key && isSensitiveKey(key)) return REDACTED;
   if (value instanceof Date) return value.toJSON();
-  if (
-    Buffer.isBuffer(value) ||
-    ArrayBuffer.isView(value) ||
-    value instanceof ArrayBuffer
-  )
-    return BINARY;
-  if (
-    value &&
-    typeof value === 'object' &&
-    (typeof (value as { pipe?: unknown }).pipe === 'function' ||
-      typeof (value as { getReader?: unknown }).getReader === 'function')
-  ) {
-    return STREAM;
-  }
+  if (isBinary(value)) return BINARY;
+  if (isStream(value)) return STREAM;
   const stringValue =
     typeof value === 'string' ? redactCredentialValues(value) : value;
   if (
@@ -214,7 +219,16 @@ function sanitize(value: unknown): unknown {
 }
 
 function capBody(value: unknown): unknown {
-  const serialized = JSON.stringify(value);
+  if (isBinary(value)) return BINARY;
+  if (isStream(value)) return STREAM;
+
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    // Let the sanitizer replace cycles before the forwarding payload is encoded.
+    return value;
+  }
   const originalBytes =
     serialized === undefined ? 0 : Buffer.byteLength(serialized, 'utf8');
   return originalBytes > OCPI_REQUEST_LOG_BODY_LIMIT_BYTES
@@ -249,11 +263,21 @@ export function sanitizeOcpiRequestLogPayload(
   payload: OcpiRequestLogPayload,
 ): OcpiRequestLogPayload {
   const ocpiStatusCode = extractOcpiStatusCode(payload.response?.body);
-  const sanitized = sanitize(payload) as OcpiRequestLogPayload;
+  const capped: OcpiRequestLogPayload = {
+    ...payload,
+    request: {
+      ...payload.request,
+      body: capBody(payload.request.body),
+    },
+    response: payload.response
+      ? {
+          ...payload.response,
+          body: capBody(payload.response.body),
+        }
+      : undefined,
+  };
+  const sanitized = sanitize(capped) as OcpiRequestLogPayload;
   if (ocpiStatusCode !== undefined) sanitized.ocpiStatusCode = ocpiStatusCode;
-  sanitized.request.body = capBody(sanitized.request.body);
-  if (sanitized.response)
-    sanitized.response.body = capBody(sanitized.response.body);
   return sanitized;
 }
 

@@ -325,6 +325,43 @@ describe('OcpiRequestLogClient', () => {
     expect(event.payload.ocpiStatusCode).toBe(2001);
   });
 
+  it('caps oversized bodies before walking them for sanitization', () => {
+    const body = {
+      toJSON: () => 'x'.repeat(256 * 1024),
+    } as Record<string, unknown>;
+    const bodyRead = jest.fn(() => {
+      throw new Error('oversized body should not be sanitized');
+    });
+    Object.defineProperty(body, 'expensive', {
+      enumerable: true,
+      get: bodyRead,
+    });
+
+    const result = sanitizeOcpiRequestLogPayload({
+      direction: 'INCOMING',
+      request: { method: 'POST', url: '/ocpi', body },
+    });
+
+    expect(result.request.body).toEqual({
+      _truncated: true,
+      originalBytes: Buffer.byteLength(JSON.stringify(body)),
+    });
+    expect(bodyRead).not.toHaveBeenCalled();
+  });
+
+  it('replaces large binary bodies before measuring their serialized size', () => {
+    const result = sanitizeOcpiRequestLogPayload({
+      direction: 'INCOMING',
+      request: {
+        method: 'POST',
+        url: '/ocpi',
+        body: Buffer.alloc(256 * 1024),
+      },
+    });
+
+    expect(result.request.body).toBe('[Binary]');
+  });
+
   it('suppresses repeated delivery errors for 60 seconds and resets after success', async () => {
     let now = 1_000;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
