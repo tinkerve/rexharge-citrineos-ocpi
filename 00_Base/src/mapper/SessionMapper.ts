@@ -210,18 +210,36 @@ export class SessionMapper extends BaseTransactionMapper {
   }
 
   /**
-   * Hours elapsed between session start and `asOf`. The CDR bills TIME over
-   * the full session duration (CdrMapper.calculateTotalTime), so the live
-   * equivalent is start → now.
+   * Charging hours so far — the live counterpart of the CDR's
+   * total_time - total_parking_time. OCPI prices TIME against charging
+   * duration, so an interval where the register did not advance is not billed:
+   * that covers the warm-up before the first energy and any mid-session stall.
+   *
+   * Must stay consistent with CdrMapper, or the running total shown to the eMSP
+   * mid-session would exceed the final receipt.
    */
   private elapsedHours(
     transaction: ITransactionDto,
     asOf: Date | string,
   ): number {
-    const start = transaction.startTime ?? transaction.createdAt;
-    if (!start) return 0;
-    const elapsedMs = new Date(asOf).getTime() - new Date(start).getTime();
-    return elapsedMs > 0 ? elapsedMs / 3600000 : 0;
+    const readings = this.getEnergyReadings(transaction);
+    if (readings.length < 2) return 0;
+
+    const asOfMs = new Date(asOf).getTime();
+    if (Number.isNaN(asOfMs)) return 0;
+
+    let chargingMs = 0;
+    for (let i = 1; i < readings.length; i++) {
+      if (readings[i].timestampMs > asOfMs) break;
+      if (this.registerAdvanced(readings[i - 1].kwh, readings[i].kwh)) {
+        chargingMs += Math.max(
+          readings[i].timestampMs - readings[i - 1].timestampMs,
+          0,
+        );
+      }
+    }
+
+    return chargingMs / 3600000;
   }
 
   /**

@@ -206,9 +206,13 @@ describe('SessionMapper.mapMeterValueToProgressPatch', () => {
   });
 
   it('includes incl_vat and the time and session components when the tariff has them', async () => {
-    const previous = makeMeterValue('2026-08-04T14:08:43.000Z', 358070);
-    const current = makeMeterValue('2026-08-04T14:09:44.000Z', 358180);
-    const transaction = makeTransaction([previous, current]);
+    // Session latches at 14:03:44 but the register does not move until
+    // 14:09:44. TIME is billed from that Energy Confirmation, not from the
+    // latch, so the warm-up is free.
+    const baseline = makeMeterValue('2026-08-04T14:08:43.000Z', 358070);
+    const confirmation = makeMeterValue('2026-08-04T14:09:44.000Z', 358180);
+    const current = makeMeterValue('2026-08-04T14:12:44.000Z', 358500);
+    const transaction = makeTransaction([baseline, confirmation, current]);
     const tariff = {
       ...TARIFF,
       pricePerKwh: 1,
@@ -222,9 +226,39 @@ describe('SessionMapper.mapMeterValueToProgressPatch', () => {
       current,
     );
 
-    // energy 0.66 + time (6 min elapsed × 0.1) 0.6 + session fee 0.5 = 1.76
-    expect(patch.total_cost?.excl_vat).toBeCloseTo(1.76, 4);
-    expect(patch.total_cost?.incl_vat).toBeCloseTo(1.936, 4);
+    // TIME is priced on charging duration, so only the two intervals where the
+    // register actually advanced count: 61s + 180s = 241s = 0.066944 h.
+    // energy 0.66 + time (0.066944 × 6) 0.4017 + session fee 0.5 = 1.5617.
+    // Billing the full wall clock from session start would have charged 9
+    // minutes of TIME (0.9) instead.
+    expect(patch.total_cost?.excl_vat).toBeCloseTo(1.5617, 4);
+    expect(patch.total_cost?.incl_vat).toBeCloseTo(1.71787, 4);
+  });
+
+  it('bills no time while the charger has latched but not yet delivered energy', async () => {
+    // Register never moves: connected, not energised. This is the shape of the
+    // five zero-energy sessions already recorded on station 55102-002, which
+    // now carries a time-only tariff.
+    const first = makeMeterValue('2026-08-04T14:08:43.000Z', 358070);
+    const current = makeMeterValue('2026-08-04T14:19:43.000Z', 358070);
+    const transaction = makeTransaction([first, current], {
+      totalKwh: 0,
+    } as unknown as Partial<ITransactionDto>);
+    const tariff = {
+      ...TARIFF,
+      pricePerKwh: 0, // time-only: no energy component to fall to zero on its own
+      pricePerMin: 0.6,
+      pricePerSession: null,
+      taxRate: null,
+    } as ITariffDto;
+
+    const patch = await makeMapper(tariff).mapMeterValueToProgressPatch(
+      transaction,
+      current,
+    );
+
+    // 16 minutes connected at RM0.60/min would have billed RM9.60.
+    expect(patch.total_cost?.excl_vat).toBe(0);
   });
 });
 

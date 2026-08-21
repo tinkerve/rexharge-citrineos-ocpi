@@ -242,13 +242,15 @@ export class EvseMapper {
     return {
       uid: UID_FORMAT(station.id, evse.id!),
       evse_id: evse.evseId,
-      status: connectors
-        ? EvseMapper.mapEvseStatusFromConnectors(
-            evse.connectors!.filter((c) =>
-              connectors.some((con) => con!.id === c.id!.toString()),
-            ),
-          )
-        : EvseStatus.UNKNOWN,
+      status: evse.removed
+        ? EvseStatus.REMOVED
+        : connectors
+          ? EvseMapper.mapEvseStatusFromConnectors(
+              evse.connectors!.filter((c) =>
+                connectors.some((con) => con!.id === c.id!.toString()),
+              ),
+            )
+          : EvseStatus.UNKNOWN,
       capabilities: station.capabilities
         ?.map((c) => EvseMapper.mapEvseCapabilities(c))
         .filter((c) => c !== null),
@@ -293,13 +295,14 @@ export class EvseMapper {
 
     return {
       evse_id: evse.evseId,
-      status:
-        connectors &&
-        EvseMapper.mapEvseStatusFromConnectors(
-          evse.connectors!.filter((c) =>
-            connectors.some((con) => con!.id === c.id!.toString()),
+      status: evse.removed
+        ? EvseStatus.REMOVED
+        : connectors &&
+          EvseMapper.mapEvseStatusFromConnectors(
+            evse.connectors!.filter((c) =>
+              connectors.some((con) => con!.id === c.id!.toString()),
+            ),
           ),
-        ),
       capabilities: station.capabilities
         ?.map((c) => EvseMapper.mapEvseCapabilities(c))
         .filter((c) => c !== null),

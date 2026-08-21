@@ -2,7 +2,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { IAuthorizationDto, ITariffDto, OCPP2_0_1 } from '@citrineos/base';
+import {
+  IAuthorizationDto,
+  IMeterValueDto,
+  ITariffDto,
+  OCPP2_0_1,
+} from '@citrineos/base';
 import { TokenDTO } from '../model/DTO/TokenDTO';
 import { ILogObj, Logger } from 'tslog';
 import { Price } from '../model/Price';
@@ -31,7 +36,7 @@ import { GET_TARIFF_BY_KEY_QUERY } from '../graphql/queries/tariff.queries';
 import { GET_TRANSACTION_BY_ID_QUERY } from '../graphql/queries/transaction.queries';
 import { TariffMapper } from './TariffMapper';
 import { GET_AUTHORIZATION_BY_ID } from '../graphql';
-import { MINUTES_IN_HOUR } from '../util/Consts';
+import { getBillingEnergyThresholdKwh, MINUTES_IN_HOUR } from '../util/Consts';
 
 export abstract class BaseTransactionMapper {
   protected constructor(
@@ -175,6 +180,86 @@ export abstract class BaseTransactionMapper {
   }
 
   /**
+   * A session's energy register readings, in kWh, sorted oldest first.
+   *
+   * The register is the only witness to whether energy actually moved. Charger
+   * status is self-reported and can be wrong in the case that matters most:
+   * EVSE fe50ec85 reported Charging across three sessions while transferring
+   * 0.000 kWh.
+   */
+  protected getEnergyReadings(
+    transaction: ITransactionDto,
+  ): Array<{ timestampMs: number; kwh: number }> {
+    const readings: Array<{ timestampMs: number; kwh: number }> = [];
+
+    for (const meterValue of transaction.meterValues ?? []) {
+      const kwh = this.getEnergyRegisterKwh(meterValue);
+      if (kwh == null || meterValue.timestamp == null) continue;
+      const timestampMs = new Date(meterValue.timestamp).getTime();
+      if (Number.isNaN(timestampMs)) continue;
+      readings.push({ timestampMs, kwh });
+    }
+
+    return readings.sort((a, b) => a.timestampMs - b.timestampMs);
+  }
+
+  /**
+   * Whether a session ever delivered enough energy to count as charging at all.
+   *
+   * Registers are cumulative and large, so subtracting two of them loses
+   * precision — 358.09 - 358.07 yields 0.019999999999527, which would fail an
+   * exact >= 0.02. Round the delta to well below one 10 Wh register step first.
+   */
+  protected hasEnergyConfirmation(transaction: ITransactionDto): boolean {
+    const threshold = getBillingEnergyThresholdKwh();
+    if (!threshold) return true;
+
+    const readings = this.getEnergyReadings(transaction);
+    if (readings.length === 0) return false;
+
+    const baseline = Math.min(...readings.map((reading) => reading.kwh));
+    const peak = Math.max(...readings.map((reading) => reading.kwh));
+
+    return this.round6(peak - baseline) >= threshold;
+  }
+
+  /**
+   * Cumulative Energy.Active.Import.Register for a meter value, in kWh.
+   * Phase-specific samples are skipped — only the aggregate is meaningful here.
+   */
+  protected getEnergyRegisterKwh(
+    meterValue?: IMeterValueDto,
+  ): number | undefined {
+    // `measurand` is optional in both OCPP 1.6 and 2.0.1 and defaults to
+    // Energy.Active.Import.Register when omitted. Requiring it to be present
+    // meant a charger that relies on the default produced no readings at all —
+    // and every consumer of an empty reading set fails OPEN: parking time falls
+    // back to self-reported status, which is the very source this branch exists
+    // because it lies, and the full wall clock gets priced.
+    const sample = meterValue?.sampledValue?.find(
+      (sampledValue) =>
+        (sampledValue.measurand ===
+          OCPP2_0_1.MeasurandEnumType.Energy_Active_Import_Register ||
+          sampledValue.measurand == null) &&
+        !sampledValue.phase,
+    );
+    if (sample?.value == null) return undefined;
+
+    const value = Number(sample.value);
+    if (!Number.isFinite(value)) return undefined;
+
+    // OCPP 1.6 reports the unit in a flat `unit` field, 2.0.1 nests it under
+    // unitOfMeasure. Production only ever sends the flat form, and two stations
+    // report kWh rather than Wh, so both shapes and both casings must be read —
+    // getting this wrong understates a session by 1000x and it silently never
+    // reaches the energy threshold.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = (sample as any).unit ?? (sample as any).unitOfMeasure?.unit;
+    const unit = typeof raw === 'string' ? raw.toUpperCase() : undefined;
+    return unit === 'KWH' ? value : value / 1000; // OCPP default unit is Wh
+  }
+
+  /**
    * Fixed per-session cost (OCPI FLAT tariff dimension).
    * Returns undefined when the tariff has no session fee.
    */
@@ -236,5 +321,24 @@ export abstract class BaseTransactionMapper {
 
   protected round4(value: number): number {
     return Math.round(value * 10000) / 10000;
+  }
+
+  protected round6(value: number): number {
+    return Math.round(value * 1000000) / 1000000;
+  }
+
+  /**
+   * Whether the energy register actually moved between two readings.
+   *
+   * This one predicate decides where charging stopped, how much parking is
+   * billable, and the live elapsed hours — so it has to answer the same way in
+   * all three places. Registers are cumulative and large, and the values arrive
+   * divided by 1000, so a bare `>` counts float noise as delivered energy:
+   * charging time inflates in one direction while billable idle shrinks in the
+   * other. Compare at the same precision hasEnergyConfirmation uses, well below
+   * one 10 Wh register step.
+   */
+  protected registerAdvanced(previousKwh: number, nextKwh: number): boolean {
+    return this.round6(nextKwh - previousKwh) > 0;
   }
 }
