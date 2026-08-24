@@ -39,17 +39,16 @@ export class TariffsClientApi extends BaseClientApi {
     tariffId: string,
   ): Promise<TariffResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${tariffId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      TariffResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: TariffResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+    });
   }
 
   async putTariff(
@@ -62,18 +61,17 @@ export class TariffsClientApi extends BaseClientApi {
     tariff: Tariff,
   ): Promise<TariffResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${tariffId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Put,
-      TariffResponseSchema,
+      httpMethod: HttpMethod.Put,
+      schema: TariffResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-      tariff,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      body: tariff,
+    });
   }
 
   async deleteTariff(
@@ -85,16 +83,15 @@ export class TariffsClientApi extends BaseClientApi {
     tariffId: string,
   ): Promise<OcpiEmptyResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${tariffId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Delete,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Delete,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+    });
   }
 }

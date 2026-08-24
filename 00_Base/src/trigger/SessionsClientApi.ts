@@ -41,15 +41,15 @@ export class SessionsClientApi extends BaseClientApi {
     toPartyId: string,
     partnerProfile: OCPIRegistration.PartnerProfile,
   ): Promise<SessionResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      SessionResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: SessionResponseSchema,
       partnerProfile,
-    );
+    });
   }
 
   async patchSession(
@@ -60,18 +60,16 @@ export class SessionsClientApi extends BaseClientApi {
     partnerProfile: OCPIRegistration.PartnerProfile,
     body: Partial<Session>,
   ): Promise<OcpiEmptyResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Patch,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Patch,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      undefined,
       body,
-    );
+    });
   }
 
   async putSession(
@@ -82,17 +80,15 @@ export class SessionsClientApi extends BaseClientApi {
     partnerProfile: OCPIRegistration.PartnerProfile,
     body: Session,
   ): Promise<OcpiEmptyResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Put,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Put,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      undefined,
       body,
-    );
+    });
   }
 }

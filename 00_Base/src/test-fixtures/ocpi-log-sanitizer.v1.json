@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "credential values and plain endpoint",
+      "input": {
+        "endpoint": "tokens-sender",
+        "message": "authorization failed for Bearer secret-value",
+        "nested": {
+          "password": "hidden"
+        }
+      },
+      "expected": {
+        "endpoint": "tokens-sender",
+        "message": "authorization failed for Bearer [REDACTED]",
+        "nested": {
+          "password": "[REDACTED]"
+        }
+      }
+    },
+    {
+      "name": "URL query and userinfo",
+      "input": {
+        "url": "https://alice:password@partner.test/ocpi?token=secret&limit=10"
+      },
+      "expected": {
+        "url": "https://partner.test/ocpi?token=%5BREDACTED%5D&limit=10"
+      }
+    }
+  ]
+}

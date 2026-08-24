@@ -128,21 +128,17 @@ export class SessionBroadcaster extends BaseBroadcaster {
         this.logger.debug(
           `Session ${path} authorized by partner ${tenantPartner.countryCode}_${tenantPartner.partyId}, targeting them only`,
         );
-        await this.sessionsClientApi.request(
-          tenant.countryCode!,
-          tenant.partyId!,
-          tenantPartner.countryCode!,
-          tenantPartner.partyId!,
-          method,
-          OcpiEmptyResponseSchema,
-          tenantPartner.partnerProfileOCPI!,
-          true,
-          undefined,
-          session,
-          undefined,
-          undefined,
+        await this.sessionsClientApi.request({
+          fromCountryCode: tenant.countryCode!,
+          fromPartyId: tenant.partyId!,
+          toCountryCode: tenantPartner.countryCode!,
+          toPartyId: tenantPartner.partyId!,
+          httpMethod: method,
+          schema: OcpiEmptyResponseSchema,
+          partnerProfile: tenantPartner.partnerProfileOCPI!,
+          body: session,
           path,
-        );
+        });
       } else {
         this.logger.warn(
           `No eMSP partner resolved for session ${path}; skipping ${method} broadcast`,

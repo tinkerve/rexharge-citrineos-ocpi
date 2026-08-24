@@ -41,16 +41,16 @@ export class CredentialsClientApi extends BaseClientApi {
     toPartyId: string,
     partnerProfile: OCPIRegistration.PartnerProfile,
   ): Promise<CredentialsResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      CredentialsResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: CredentialsResponseSchema,
       partnerProfile,
-      false,
-    );
+      routingHeaders: false,
+    });
   }
 
   async postCredentials(
@@ -62,22 +62,18 @@ export class CredentialsClientApi extends BaseClientApi {
     body: CredentialsDTO,
     overrideToken?: string,
   ): Promise<CredentialsResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Post,
-      CredentialsResponseSchema,
+      httpMethod: HttpMethod.Post,
+      schema: CredentialsResponseSchema,
       partnerProfile,
-      false,
-      undefined,
+      routingHeaders: false,
       body,
-      undefined,
-      undefined,
-      undefined,
       overrideToken,
-    );
+    });
   }
 
   async putCredentials(
@@ -89,22 +85,18 @@ export class CredentialsClientApi extends BaseClientApi {
     body: CredentialsDTO,
     overrideToken?: string,
   ): Promise<CredentialsResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Put,
-      CredentialsResponseSchema,
+      httpMethod: HttpMethod.Put,
+      schema: CredentialsResponseSchema,
       partnerProfile,
-      false,
-      undefined,
+      routingHeaders: false,
       body,
-      undefined,
-      undefined,
-      undefined,
       overrideToken,
-    );
+    });
   }
 
   async deleteCredentials(
@@ -114,15 +106,15 @@ export class CredentialsClientApi extends BaseClientApi {
     toPartyId: string,
     partnerProfile: OCPIRegistration.PartnerProfile,
   ): Promise<OcpiEmptyResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Delete,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Delete,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      false,
-    );
+      routingHeaders: false,
+    });
   }
 }

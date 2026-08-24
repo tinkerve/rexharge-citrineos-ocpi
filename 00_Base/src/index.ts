@@ -16,6 +16,8 @@ import { version } from '../../package.json';
 import { OcpiConfig, OcpiConfigToken } from './config/ocpi.types';
 import { IDtoModule } from './events';
 import { OcpiGraphqlClient } from './graphql/OcpiGraphqlClient';
+import { OcpiRequestLogClient } from './services/OcpiRequestLogClient';
+import { OcpiRequestLogMiddleware } from './util/middleware/OcpiRequestLogMiddleware';
 
 export * from './broadcaster';
 export * from './mapper';
@@ -387,7 +389,7 @@ export class OcpiServer extends KoaServer {
       const options: RoutingControllersOptions = {
         controllers: [...controllers, HealthController],
         routePrefix: '/ocpi',
-        middlewares: [],
+        middlewares: [OcpiRequestLogMiddleware],
         defaultErrorHandler: false,
       } as RoutingControllersOptions;
       this.initApp(options);
@@ -417,6 +419,7 @@ export class OcpiServer extends KoaServer {
     Container.set(OcpiConfigToken, this.ocpiConfig);
     Container.set(CacheWrapper, new CacheWrapper(this.cache));
     Container.set(Logger, this.logger);
+    Container.get(OcpiRequestLogClient);
 
     Container.set(
       OcpiGraphqlClient,

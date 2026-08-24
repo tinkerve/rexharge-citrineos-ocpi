@@ -38,17 +38,16 @@ export class CdrsClientApi extends BaseClientApi {
     partnerProfile: OCPIRegistration.PartnerProfile,
     url: string, // Provided in the response to a Cdr POST
   ): Promise<CdrResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      CdrResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: CdrResponseSchema,
       partnerProfile,
-      true,
       url,
-    );
+    });
   }
 
   async postCdr(
@@ -59,17 +58,15 @@ export class CdrsClientApi extends BaseClientApi {
     partnerProfile: OCPIRegistration.PartnerProfile,
     body: Cdr,
   ): Promise<OcpiEmptyResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Post,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Post,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      undefined,
       body,
-    );
+    });
   }
 }

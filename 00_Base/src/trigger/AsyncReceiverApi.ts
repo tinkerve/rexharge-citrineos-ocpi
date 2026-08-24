@@ -25,17 +25,16 @@ export class AsyncReceiverApi extends BaseClientApi {
     url: string,
     body: any,
   ): Promise<OcpiEmptyResponse> {
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Post,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Post,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
       url,
       body,
-    );
+    });
   }
 }

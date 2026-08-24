@@ -55,17 +55,17 @@ export class LocationsClientApi extends BaseClientApi {
     connectorId: string,
   ): Promise<ConnectorResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}/${evseUid}/${connectorId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      ConnectorResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: ConnectorResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      locationId,
+    });
   }
 
   async getEvse(
@@ -78,17 +78,17 @@ export class LocationsClientApi extends BaseClientApi {
     evseUid: string,
   ): Promise<EvseResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}/${evseUid}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      EvseResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: EvseResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      locationId,
+    });
   }
 
   async getLocation(
@@ -100,17 +100,17 @@ export class LocationsClientApi extends BaseClientApi {
     locationId: string,
   ): Promise<LocationResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Get,
-      LocationResponseSchema,
+      httpMethod: HttpMethod.Get,
+      schema: LocationResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      locationId,
+    });
   }
 
   async patchConnector(
@@ -125,18 +125,18 @@ export class LocationsClientApi extends BaseClientApi {
     requestBody: Partial<ConnectorDTO>,
   ): Promise<OcpiEmptyResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}/${evseUid}/${connectorId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Patch,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Patch,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-      requestBody,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      body: requestBody,
+      locationId,
+    });
   }
 
   async patchEvse(
@@ -150,18 +150,18 @@ export class LocationsClientApi extends BaseClientApi {
     requestBody: Partial<EvseDTO>,
   ): Promise<OcpiEmptyResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}/${evseUid}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Patch,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Patch,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-      requestBody,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      body: requestBody,
+      locationId,
+    });
   }
 
   async patchLocation(
@@ -174,18 +174,18 @@ export class LocationsClientApi extends BaseClientApi {
     requestBody: Partial<LocationDTO>,
   ): Promise<OcpiEmptyResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Patch,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Patch,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-      requestBody,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      body: requestBody,
+      locationId,
+    });
   }
 
   async putConnector(
@@ -200,18 +200,18 @@ export class LocationsClientApi extends BaseClientApi {
     connector: ConnectorDTO,
   ): Promise<OcpiEmptyResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}/${evseUid}/${connectorId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Put,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Put,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-      connector,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      body: connector,
+      locationId,
+    });
   }
 
   async putEvse(
@@ -225,18 +225,18 @@ export class LocationsClientApi extends BaseClientApi {
     evse: EvseDTO,
   ): Promise<OcpiEmptyResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}/${evseUid}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Put,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Put,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-      evse,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      body: evse,
+      locationId,
+    });
   }
 
   async putLocation(
@@ -249,17 +249,17 @@ export class LocationsClientApi extends BaseClientApi {
     location: LocationDTO,
   ): Promise<OcpiEmptyResponse> {
     const path = `${fromCountryCode}/${fromPartyId}/${locationId}`;
-    return this.request(
+    return this.request({
       fromCountryCode,
       fromPartyId,
       toCountryCode,
       toPartyId,
-      HttpMethod.Put,
-      OcpiEmptyResponseSchema,
+      httpMethod: HttpMethod.Put,
+      schema: OcpiEmptyResponseSchema,
       partnerProfile,
-      true,
-      `${this.getUrl(partnerProfile)}/${path}`,
-      location,
-    );
+      url: `${this.getUrl(partnerProfile)}/${path}`,
+      body: location,
+      locationId,
+    });
   }
 }

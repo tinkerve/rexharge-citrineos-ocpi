@@ -42,22 +42,18 @@ export class VersionsClientApi extends BaseClientApi {
     overrideToken?: string,
   ): Promise<VersionListResponseDTO> {
     try {
-      return this.request(
+      return this.request({
         fromCountryCode,
         fromPartyId,
         toCountryCode,
         toPartyId,
-        HttpMethod.Get,
-        VersionListResponseDTOSchema,
+        httpMethod: HttpMethod.Get,
+        schema: VersionListResponseDTOSchema,
         partnerProfile,
-        false,
+        routingHeaders: false,
         url,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
         overrideToken,
-      );
+      });
     } catch (e: any) {
       throw new UnsuccessfulRequestException(
         `Could not get version list. Error: ${e.message}`,
@@ -76,22 +72,18 @@ export class VersionsClientApi extends BaseClientApi {
   ): Promise<VersionDetailsResponseDTO> {
     try {
       url = url || this.getUrl(partnerProfile, VersionsInterface.DETAILS);
-      return this.request(
+      return this.request({
         fromCountryCode,
         fromPartyId,
         toCountryCode,
         toPartyId,
-        HttpMethod.Get,
-        VersionDetailsResponseDTOSchema,
+        httpMethod: HttpMethod.Get,
+        schema: VersionDetailsResponseDTOSchema,
         partnerProfile,
-        false,
+        routingHeaders: false,
         url,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
         overrideToken,
-      );
+      });
     } catch (e: any) {
       throw new UnsuccessfulRequestException(
         `Could not get version details. Error: ${e.message}`,
