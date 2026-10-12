@@ -4,6 +4,7 @@
 
 import { readFileSync } from 'fs';
 import { ILogObj, Logger } from 'tslog';
+import { Container } from 'typedi';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
 import { CdrMapper } from '../mapper/CdrMapper';
 import { SessionMapper } from '../mapper/SessionMapper';
@@ -97,6 +98,10 @@ export async function runBackfillCli(
       ? { 'x-hasura-admin-secret': env.HASURA_ADMIN_SECRET }
       : undefined,
   );
+  // Some mapper dependencies resolve these through typedi, as the server
+  // registers them in its bootstrap; outside the server they must be set here.
+  Container.set(Logger, logger);
+  Container.set(OcpiGraphqlClient, client);
   const locations = new LocationsService(logger, client);
   const mapper = new CdrMapper(
     logger,
