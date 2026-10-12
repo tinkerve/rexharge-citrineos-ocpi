@@ -137,12 +137,13 @@ export class CdrMapper extends BaseTransactionMapper {
   }
 
   private async mapSessionToCDR(
-    session: Session,
+    rawSession: Session,
     transaction: ITransactionDto | undefined,
     location: LocationDTO,
     tariff: ITariffDto,
     ocpiTariff: OcpiTariff,
   ): Promise<Cdr> {
+    const session = this.withCdrEndDateTime(rawSession, transaction);
     const totalEnergy = session.kwh;
     const totalTime = this.calculateTotalTime(session);
     const totalParkingTime = await this.calculateTotalParkingTime(
@@ -222,6 +223,42 @@ export class CdrMapper extends BaseTransactionMapper {
   }
 
   /**
+   * A CDR is only built for a stopped transaction, so it always has an end,
+   * even when the session itself has none yet.
+   *
+   * The session leaves end_date_time empty for a Local/Remote/EmergencyStop
+   * stop until the connector's return to Available records customData.unplugTime
+   * (the car may still be parked). When that notification never arrived, the
+   * session would otherwise end up with an empty end_date_time, a total_time
+   * of 0 and a cost of 0. End it at the transaction's own endTime, then the
+   * StopTransaction timestamp.
+   */
+  private withCdrEndDateTime(
+    session: Session,
+    transaction: ITransactionDto | undefined,
+  ): Session {
+    if (session.end_date_time || !transaction) return session;
+    const endDateTime = toISOStringIfNeeded(
+      transaction.endTime ?? transaction.stopTransaction?.timestamp,
+    );
+    return endDateTime ? { ...session, end_date_time: endDateTime } : session;
+  }
+
+  /**
+   * When the car was physically unplugged: the recorded unplugTime, or endTime
+   * for an EVDisconnected stop (where the stop is the disconnect). Undefined
+   * when neither exists, in which case nothing proves the car stayed.
+   */
+  private getUnplugTime(transaction: ITransactionDto): string | undefined {
+    const unplugTime = transaction.customData?.unplugTime;
+    if (unplugTime) return unplugTime;
+    if (transaction.stoppedReason === 'EVDisconnected') {
+      return toISOStringIfNeeded(transaction.endTime);
+    }
+    return undefined;
+  }
+
+  /**
    * OCPI total_parking_time: "Total duration of the charging session where the
    * EV was not charging (no energy was transferred between EVSE and EV)."
    *
@@ -294,10 +331,11 @@ export class CdrMapper extends BaseTransactionMapper {
    * they have finished using.
    *
    * Returns 0 when the session never charged: a car that plugged into a dead
-   * charger and left is not hogging.
+   * charger and left is not hogging. Also 0 when no unplug time is known (see
+   * getUnplugTime): a stop alone does not prove the car stayed.
    */
   private calculateBillablePostChargingIdle(
-    session: Session,
+    _session: Session,
     transaction: ITransactionDto,
   ): number {
     if (!this.hasEnergyConfirmation(transaction)) return 0;
@@ -314,11 +352,9 @@ export class CdrMapper extends BaseTransactionMapper {
     }
     if (lastAdvanceMs == null) return 0;
 
-    const unplugMs = this.toMs(
-      transaction.customData?.unplugTime ??
-        transaction.endTime ??
-        session.end_date_time,
-    );
+    // Without an unplug time the session end is only the stop itself, so the
+    // time after charging is not proven to be the car hogging the connector.
+    const unplugMs = this.toMs(this.getUnplugTime(transaction));
     if (unplugMs == null) return 0;
 
     const idleMs = unplugMs - lastAdvanceMs;

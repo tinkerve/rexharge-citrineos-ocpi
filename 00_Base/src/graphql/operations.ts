@@ -174,6 +174,17 @@ export type GetCdrRecordsQueryResult = {
   };
 };
 
+export type GetCdrRecordByTransactionIdQueryVariables = Exact<{
+  transactionId: Scalars['Int']['input'];
+}>;
+
+export type GetCdrRecordByTransactionIdQueryResult = {
+  CdrRecords: Array<{
+    id: number;
+    cdrId: string;
+  }>;
+};
+
 export type GetChargingStationByIdQueryVariables = Exact<{
   id: Scalars['String']['input'];
 }>;

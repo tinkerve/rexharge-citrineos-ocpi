@@ -279,12 +279,21 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
     }
     // Determine if this event signals a session ending vs a normal in-session update
     // (e.g., kwh update). Only session-end events require the full transaction.
+    //
+    // A stop can arrive as two updates: OCPP 1.6 StopTransaction first writes
+    // isActive/endTime, then a second save writes stoppedReason/totalKwh. The
+    // notify trigger sends only changed columns, so the second payload carries
+    // stoppedReason alone — and it is the first one whose re-fetch can see the
+    // stop reason. It must count as a session end too, or an EVDisconnected
+    // session never gets its CDR.
     const isSessionEndEvent =
-      transactionDto.isActive === false || transactionDto.endTime != null;
+      transactionDto.isActive === false ||
+      transactionDto.endTime != null ||
+      transactionDto.stoppedReason != null;
 
     if (isSessionEndEvent) {
       this._logger.debug(
-        `Session-end event for transaction ${transactionDto.id} (isActive=${transactionDto.isActive}, endTime=${transactionDto.endTime})`,
+        `Session-end event for transaction ${transactionDto.id} (isActive=${transactionDto.isActive}, endTime=${transactionDto.endTime}, stoppedReason=${transactionDto.stoppedReason})`,
       );
 
       const fullTransactionDtoResponse = await this.ocpiGraphqlClient.request<

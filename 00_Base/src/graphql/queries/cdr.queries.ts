@@ -83,6 +83,17 @@ export const GET_CDR_RECORDS_QUERY = gql`
   }
 `;
 
+// Idempotency check before a CDR goes to a partner: a transaction whose CDR
+// is already stored must not be POSTed again.
+export const GET_CDR_RECORD_BY_TRANSACTION_ID_QUERY = gql`
+  query GetCdrRecordByTransactionId($transactionId: Int!) {
+    CdrRecords(where: { transactionId: { _eq: $transactionId } }, limit: 1) {
+      id
+      cdrId
+    }
+  }
+`;
+
 // Backfill: same insert as INSERT_CDR_RECORD_MUTATION, but an existing cdrId is
 // left completely untouched. The broadcaster's version bumps updatedAt on
 // conflict, which would re-surface an already-delivered CDR in a partner's

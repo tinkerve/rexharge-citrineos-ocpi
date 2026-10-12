@@ -410,9 +410,10 @@ describe('CdrBackfill', () => {
         { request: broadcasterRequest } as unknown as OcpiGraphqlClient,
       );
       await broadcaster.broadcastPostCdr(makeTransaction(52) as any);
-      const [query, persisted] = broadcasterRequest.mock.calls[0];
+      const [, persisted] = broadcasterRequest.mock.calls.find(
+        ([query]) => query === INSERT_CDR_RECORD_MUTATION,
+      )!;
 
-      expect(query).toBe(INSERT_CDR_RECORD_MUTATION);
       const strip = (vars: Record<string, unknown>) => ({
         ...vars,
         createdAt: undefined,

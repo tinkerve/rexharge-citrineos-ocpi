@@ -17,6 +17,14 @@ export function buildCdrRecordVariables(
   transaction: ITransactionDto,
   now: string = new Date().toISOString(),
 ): InsertCdrRecordMutationVariables {
+  // CdrRecords.endDateTime is NOT NULL timestamptz: an empty string reaches
+  // Postgres as invalid input syntax. Fail here with the transaction named.
+  if (!cdr.end_date_time) {
+    throw new Error(
+      `CDR ${cdr.id} for transaction ${transaction.id} has no end_date_time; refusing to persist an empty endDateTime`,
+    );
+  }
+
   const tenantPartnerId =
     transaction.authorization?.tenantPartner?.id ?? undefined;
 

@@ -184,13 +184,31 @@ describe('CdrMapper billable post-charging idle', () => {
     expect(billableIdle(transaction)).toBeCloseTo(1 / 3, 4);
   });
 
-  it('falls back to session end when no unplug time was recorded', () => {
+  it('charges no idle when no unplug time was recorded', () => {
     const transaction = makeTransaction([
       makeMeterValue('2026-08-04T14:01:00.000Z', 358070),
       makeMeterValue('2026-08-04T14:10:00.000Z', 358500),
     ]);
 
-    // Session ends 15:00, charging stopped 14:10 — 50 min idle, 20 billable.
+    // Session ends 15:00 but nothing shows the car stayed until then.
+    expect(billableIdle(transaction)).toBe(0);
+  });
+
+  it('treats endTime as the unplug time for an EVDisconnected stop', () => {
+    const transaction = makeTransaction(
+      [
+        makeMeterValue('2026-08-04T14:01:00.000Z', 358070),
+        makeMeterValue('2026-08-04T14:10:00.000Z', 358500),
+      ],
+      {
+        stoppedReason: 'EVDisconnected',
+        endTime: '2026-08-04T14:40:00.000Z',
+      } as unknown as Partial<ITransactionDto>,
+    );
+
+    // 30 min idle, 30 min default buffer.
+    expect(billableIdle(transaction)).toBe(0);
+    process.env.BILLING_IDLE_BUFFER_MINUTES = `{"${STATION}":10}`;
     expect(billableIdle(transaction)).toBeCloseTo(1 / 3, 4);
   });
 });
