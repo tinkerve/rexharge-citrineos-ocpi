@@ -54,9 +54,17 @@ export type Tariffs_Bool_Exp = {
   Tenant?: InputMaybe<Tenants_Bool_Exp>;
 };
 export type Transactions_Bool_Exp = {
+  _not?: InputMaybe<Transactions_Bool_Exp>;
+  CdrRecord?: InputMaybe<CdrRecords_Bool_Exp>;
+  isActive?: InputMaybe<Boolean_Comparison_Exp>;
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
   Authorization?: InputMaybe<Authorizations_Bool_Exp>;
   Tenant?: InputMaybe<Tenants_Bool_Exp>;
+};
+export type CdrRecords_Bool_Exp = {
+  updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
+  TenantPartner?: InputMaybe<TenantPartners_Bool_Exp>;
+  Transaction?: InputMaybe<Transactions_Bool_Exp>;
 };
 export type Authorizations_Bool_Exp = {
   TenantPartner?: InputMaybe<TenantPartners_Bool_Exp>;
@@ -70,6 +78,7 @@ export type Tenants_Bool_Exp = {
   partyId?: InputMaybe<String_Comparison_Exp>;
 };
 export type TenantPartners_Bool_Exp = {
+  id?: InputMaybe<Int_Comparison_Exp>;
   countryCode?: InputMaybe<String_Comparison_Exp>;
   partyId?: InputMaybe<String_Comparison_Exp>;
 };
@@ -78,6 +87,10 @@ export type String_Comparison_Exp = {
 };
 export type Int_Comparison_Exp = {
   _eq?: InputMaybe<Scalars['Int']['input']>;
+  _is_null?: InputMaybe<Scalars['Boolean']['input']>;
+};
+export type Boolean_Comparison_Exp = {
+  _eq?: InputMaybe<Scalars['Boolean']['input']>;
 };
 export type TenantPartnerLocations_Bool_Exp = {
   tenantPartnerId?: InputMaybe<Int_Comparison_Exp>;
@@ -111,6 +124,54 @@ export type InsertCdrRecordMutationResult = {
     id: number;
     cdrId: string;
   } | null;
+};
+
+export type InsertCdrRecordIfAbsentMutationVariables =
+  InsertCdrRecordMutationVariables;
+
+export type InsertCdrRecordIfAbsentMutationResult = {
+  insert_CdrRecords_one?: {
+    id: number;
+    cdrId: string;
+  } | null;
+};
+
+export type GetCdrBackfillCandidatesQueryVariables = Exact<{
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  where: Transactions_Bool_Exp;
+}>;
+
+// Rows are handed to the mappers as ITransactionDto, so only the shape the
+// backfill itself reads is typed.
+export type GetCdrBackfillCandidatesQueryResult = {
+  Transactions: Array<{
+    id: number;
+    isActive?: boolean | null;
+    authorization?: {
+      tenantPartner?: { id: number } | null;
+    } | null;
+    [field: string]: any;
+  }>;
+};
+
+export type GetCdrRecordsQueryVariables = Exact<{
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  where: CdrRecords_Bool_Exp;
+}>;
+
+export type GetCdrRecordsQueryResult = {
+  CdrRecords: Array<{
+    id: number;
+    cdrId: string;
+    cdrData: any;
+  }>;
+  CdrRecords_aggregate: {
+    aggregate?: {
+      count: number;
+    } | null;
+  };
 };
 
 export type GetChargingStationByIdQueryVariables = Exact<{

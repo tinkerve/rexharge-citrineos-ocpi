@@ -59,15 +59,24 @@ export type Authorizations_Set_Input = {
 export type Locations_Bool_Exp = {
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
   Tenant?: InputMaybe<Tenants_Bool_Exp>;
+  TenantPartnerLocations?: InputMaybe<TenantPartnerLocations_Bool_Exp>;
 };
 export type Tariffs_Bool_Exp = {
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
   Tenant?: InputMaybe<Tenants_Bool_Exp>;
 };
 export type Transactions_Bool_Exp = {
+  _not?: InputMaybe<Transactions_Bool_Exp>;
+  CdrRecord?: InputMaybe<CdrRecords_Bool_Exp>;
+  isActive?: InputMaybe<Boolean_Comparison_Exp>;
   updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
   Authorization?: InputMaybe<Authorizations_Bool_Exp>;
   Tenant?: InputMaybe<Tenants_Bool_Exp>;
+};
+export type CdrRecords_Bool_Exp = {
+  updatedAt?: InputMaybe<Timestamptz_Comparison_Exp>;
+  TenantPartner?: InputMaybe<TenantPartners_Bool_Exp>;
+  Transaction?: InputMaybe<Transactions_Bool_Exp>;
 };
 export type Authorizations_Bool_Exp = {
   TenantPartner?: InputMaybe<TenantPartners_Bool_Exp>;
@@ -81,11 +90,22 @@ export type Tenants_Bool_Exp = {
   partyId?: InputMaybe<String_Comparison_Exp>;
 };
 export type TenantPartners_Bool_Exp = {
+  id?: InputMaybe<Int_Comparison_Exp>;
   countryCode?: InputMaybe<String_Comparison_Exp>;
   partyId?: InputMaybe<String_Comparison_Exp>;
 };
 export type String_Comparison_Exp = {
   _eq?: InputMaybe<Scalars['String']['input']>;
+};
+export type Int_Comparison_Exp = {
+  _eq?: InputMaybe<Scalars['Int']['input']>;
+  _is_null?: InputMaybe<Scalars['Boolean']['input']>;
+};
+export type Boolean_Comparison_Exp = {
+  _eq?: InputMaybe<Scalars['Boolean']['input']>;
+};
+export type TenantPartnerLocations_Bool_Exp = {
+  tenantPartnerId?: InputMaybe<Int_Comparison_Exp>;
 };`,
           },
         },

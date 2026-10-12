@@ -24,6 +24,7 @@
   "scripts": {
     "test": "jest --config jest.config.js",
     "sync-db": "ts-node ./db.sync.ts",
+    "backfill-cdrs": "ts-node ./backfill-missing-cdrs.ts",
     "init-db": "npx sequelize-cli db:migrate --debug && echo migration completed successfully",
     "seed-db": "npx sequelize-cli db:seed:all --debug",
     "seed-undo": "npx sequelize-cli db:seed:undo:all --debug",

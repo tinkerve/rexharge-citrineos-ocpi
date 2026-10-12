@@ -28,6 +28,7 @@ import {
 import { toISOStringIfNeeded } from '../util/DateTimeHelper';
 import { BaseTransactionMapper } from './BaseTransactionMapper';
 import { SessionMapper } from './SessionMapper';
+import { TariffMapper } from './TariffMapper';
 
 @Service()
 export class CdrMapper extends BaseTransactionMapper {
@@ -40,11 +41,29 @@ export class CdrMapper extends BaseTransactionMapper {
     super(logger, locationsService, ocpiGraphqlClient);
   }
 
+  /**
+   * `options.tariffOverrides` (keyed by transaction id) prices those
+   * transactions with the given tariff instead of the station's current one,
+   * and embeds that tariff in the CDR. Used only by the backfill, where a
+   * human has confirmed what applied at session time; the live path never
+   * passes it.
+   */
   public async mapTransactionsToCdrs(
     transactions: ITransactionDto[],
+    options: { tariffOverrides?: Map<string, ITariffDto> } = {},
   ): Promise<Cdr[]> {
     try {
+      const tariffOverrides = options.tariffOverrides ?? new Map();
       const validTransactions = this.getCompletedTransactions(transactions);
+      // Note: this sets transaction.tariff on the caller's object when overrides are given.
+      // Pre-seeding transaction.tariff is what getTariffsForTransactions (and
+      // so the session mapper) honours instead of looking up the current one.
+      for (const transaction of validTransactions) {
+        const override = tariffOverrides.get(String(transaction.id));
+        if (override) {
+          transaction.tariff = override;
+        }
+      }
       const transactionIdToTransactionMap = new Map<string, ITransactionDto>(
         validTransactions
           .filter((transaction) => transaction.id !== undefined)
@@ -60,9 +79,17 @@ export class CdrMapper extends BaseTransactionMapper {
         ]);
       const transactionIdToOcpiTariffMap: Map<string, OcpiTariff> =
         await this.getOcpiTariffsForTransactions(
-          sessions,
+          sessions.filter((session) => !tariffOverrides.has(session.id)),
           transactionIdToTariffMap,
         );
+      for (const [transactionId, override] of tariffOverrides) {
+        if (transactionIdToTariffMap.has(transactionId)) {
+          transactionIdToOcpiTariffMap.set(
+            transactionId,
+            TariffMapper.map(override),
+          );
+        }
+      }
       return await this.mapSessionsToCDRs(
         sessions,
         transactionIdToTransactionMap,

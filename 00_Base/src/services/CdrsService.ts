@@ -5,22 +5,22 @@
 import { Service } from 'typedi';
 import { DEFAULT_LIMIT, DEFAULT_OFFSET } from '../model/PaginatedResponse';
 import { OcpiGraphqlClient } from '../graphql/OcpiGraphqlClient';
-import { CdrMapper } from '../mapper/CdrMapper';
-import { GET_TRANSACTIONS_QUERY } from '../graphql/queries/transaction.queries';
-import { ITransactionDto } from '@citrineos/base';
+import { GET_CDR_RECORDS_QUERY } from '../graphql/queries/cdr.queries';
 import {
-  GetTransactionsQueryResult,
-  GetTransactionsQueryVariables,
-  Transactions_Bool_Exp,
+  CdrRecords_Bool_Exp,
+  GetCdrRecordsQueryResult,
+  GetCdrRecordsQueryVariables,
 } from '../graphql/operations';
 
 @Service()
 export class CdrsService {
-  constructor(
-    private readonly ocpiGraphqlClient: OcpiGraphqlClient,
-    private readonly cdrMapper: CdrMapper,
-  ) {}
+  constructor(private readonly ocpiGraphqlClient: OcpiGraphqlClient) {}
 
+  /**
+   * Serves the CDRs persisted at session end (CdrRecords.cdrData) exactly as
+   * stored. They are never rebuilt from transactions, so a later tariff edit
+   * or mapper change cannot alter a CDR a partner has already received.
+   */
   public async getCdrs(
     fromCountryCode: string,
     fromPartyId: string,
@@ -31,15 +31,15 @@ export class CdrsService {
     offset: number = DEFAULT_OFFSET,
     limit: number = DEFAULT_LIMIT,
   ) {
-    const where: Transactions_Bool_Exp = {
-      Tenant: {
-        countryCode: { _eq: toCountryCode },
-        partyId: { _eq: toPartyId },
+    const where: CdrRecords_Bool_Exp = {
+      TenantPartner: {
+        countryCode: { _eq: fromCountryCode },
+        partyId: { _eq: fromPartyId },
       },
-      Authorization: {
-        TenantPartner: {
-          countryCode: { _eq: fromCountryCode },
-          partyId: { _eq: fromPartyId },
+      Transaction: {
+        Tenant: {
+          countryCode: { _eq: toCountryCode },
+          partyId: { _eq: toPartyId },
         },
       },
     };
@@ -49,22 +49,14 @@ export class CdrsService {
     if (Object.keys(dateFilters).length > 0) {
       where.updatedAt = dateFilters;
     }
-    const variables = {
-      offset,
-      limit,
-      where,
-    };
     const result = await this.ocpiGraphqlClient.request<
-      GetTransactionsQueryResult,
-      GetTransactionsQueryVariables
-    >(GET_TRANSACTIONS_QUERY, variables);
-    const mappedCdr = await this.cdrMapper.mapTransactionsToCdrs(
-      result.Transactions as ITransactionDto[],
-    );
+      GetCdrRecordsQueryResult,
+      GetCdrRecordsQueryVariables
+    >(GET_CDR_RECORDS_QUERY, { offset, limit, where });
 
     return {
-      data: mappedCdr,
-      total: result.Transactions.length,
+      data: result.CdrRecords.map((record) => record.cdrData),
+      total: result.CdrRecords_aggregate.aggregate?.count ?? 0,
       offset: offset,
       limit: limit,
     };

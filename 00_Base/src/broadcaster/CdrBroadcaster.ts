@@ -11,11 +11,12 @@ import {
   InsertCdrRecordMutationVariables,
 } from '../graphql/operations';
 import { INSERT_CDR_RECORD_MUTATION } from '../graphql/queries/cdr.queries';
-import { CdrMapper } from '../mapper';
+import { CdrMapper } from '../mapper/CdrMapper';
 import { Cdr } from '../model/Cdr';
 import { OcpiEmptyResponseSchema } from '../model/OcpiEmptyResponse';
 import { CdrsClientApi } from '../trigger/CdrsClientApi';
 import { BaseBroadcaster } from './BaseBroadcaster';
+import { buildCdrRecordVariables } from './CdrRecordVariables';
 
 @Service()
 export class CdrBroadcaster extends BaseBroadcaster {
@@ -71,34 +72,7 @@ export class CdrBroadcaster extends BaseBroadcaster {
     transaction: ITransactionDto,
   ): Promise<void> {
     try {
-      const now = new Date().toISOString();
-      const tenantPartnerId =
-        transaction.authorization?.tenantPartner?.id ?? undefined;
-
-      const variables: InsertCdrRecordMutationVariables = {
-        cdrId: cdr.id,
-        transactionId: transaction.id ?? undefined,
-        tenantPartnerId,
-        ocpiSessionId: cdr.session_id ?? undefined,
-        startDateTime: cdr.start_date_time,
-        endDateTime: cdr.end_date_time,
-        currency: cdr.currency,
-        totalEnergy: cdr.total_energy,
-        totalTime: cdr.total_time,
-        totalParkingTime: cdr.total_parking_time ?? 0,
-        totalCostExclVat: cdr.total_cost.excl_vat,
-        totalCostInclVat: cdr.total_cost.incl_vat ?? undefined,
-        totalEnergyCostExclVat: cdr.total_energy_cost?.excl_vat ?? undefined,
-        totalTimeCostExclVat: cdr.total_time_cost?.excl_vat ?? undefined,
-        totalParkingCostExclVat: cdr.total_parking_cost?.excl_vat ?? undefined,
-        totalFixedCostExclVat: cdr.total_fixed_cost?.excl_vat ?? undefined,
-        totalReservationCostExclVat:
-          cdr.total_reservation_cost?.excl_vat ?? undefined,
-        taxRate: undefined,
-        cdrData: cdr as any,
-        createdAt: now,
-        updatedAt: now,
-      };
+      const variables = buildCdrRecordVariables(cdr, transaction);
 
       await this.ocpiGraphqlClient.request<
         InsertCdrRecordMutationResult,
