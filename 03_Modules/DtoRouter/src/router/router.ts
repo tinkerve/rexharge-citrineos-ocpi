@@ -55,6 +55,15 @@ export class DtoRouter implements IDtoRouter {
     return this._sender;
   }
 
+  /**
+   * Runs `listener` once the notification connection is up (right away if it
+   * already is) and again after every reconnect. Notifications sent while it
+   * was down are lost, so this is where to catch up on them.
+   */
+  onConnected(listener: () => unknown): void {
+    this._subscriber.onConnected(listener);
+  }
+
   async shutdown(): Promise<void> {
     this._subscriber.shutdown();
     this._sender.shutdown();
@@ -65,7 +74,8 @@ export class DtoRouter implements IDtoRouter {
     eventType: DtoEventType,
     objectType: DtoEventObjectType,
   ): Promise<boolean> {
-    this._subscriber.subscribe(
+    // Awaited so the LISTEN is in place before the server runs catch-up.
+    await this._subscriber.subscribe(
       eventId,
       async (event: { eventType: DtoEventType; payload: T }) => {
         this._logger.info(

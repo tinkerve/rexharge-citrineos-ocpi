@@ -11,20 +11,34 @@ import {
   DtoEventObjectType,
   DtoEventType,
   EvseStatus,
+  GET_FIRST_AVAILABLE_STATUS_NOTIFICATION_QUERY,
   GET_RECENTLY_ENDED_TRANSACTION_BY_EVSE_QUERY,
+  GET_UNPLUG_CANDIDATE_BY_TRANSACTION_ID_QUERY,
+  GET_UNPLUG_CATCH_UP_CANDIDATES_QUERY,
   LocationsBroadcaster,
   GET_TRANSACTION_BY_ID_QUERY,
+  GetFirstAvailableStatusNotificationQueryResult,
+  GetFirstAvailableStatusNotificationQueryVariables,
   GetRecentlyEndedTransactionByEvseQueryResult,
   GetRecentlyEndedTransactionByEvseQueryVariables,
   GetTransactionByTransactionIdQueryResult,
   GetTransactionByTransactionIdQueryVariables,
+  GetUnplugCandidateByTransactionIdQueryResult,
+  GetUnplugCandidateByTransactionIdQueryVariables,
+  GetUnplugCatchUpCandidatesQueryResult,
+  GetUnplugCatchUpCandidatesQueryVariables,
   IDtoEvent,
   OcpiConfig,
   OcpiConfigToken,
   OcpiGraphqlClient,
   OcpiModule,
   RabbitMqDtoReceiver,
+  RECORD_TRANSACTION_UNPLUG_TIME_MUTATION,
+  RecordTransactionUnplugTimeMutationResult,
+  RecordTransactionUnplugTimeMutationVariables,
   SessionBroadcaster,
+  StatusNotifications_Bool_Exp,
+  UnplugCandidateTransaction,
   UPDATE_TRANSACTION_CUSTOM_DATA_MUTATION,
   UpdateTransactionCustomDataMutationResult,
   UpdateTransactionCustomDataMutationVariables,
@@ -40,6 +54,9 @@ export { SessionsModuleApi } from './module/SessionsModuleApi';
 @Service()
 export class SessionsModule extends AbstractDtoModule implements OcpiModule {
   private cache: ICache;
+  /** The running unplug catch-up, if any; see catchUpMissedUnplugs. */
+  private unplugCatchUp?: Promise<void>;
+  private unplugCatchUpAgain = false;
 
   constructor(
     @Inject(OcpiConfigToken) config: OcpiConfig,
@@ -317,6 +334,8 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       // with potentially stale/incomplete status (e.g., ACTIVE when session just ended).
       await this.sessionBroadcaster.broadcastPatchSession(tenant, fullTransactionDto);
 
+      await this.recordUnplugAlreadyMissed(fullTransactionDto);
+
       // CDR is only sent here for EVDisconnected: endTime is the physical unplug time
       // and no further wait is needed. All other stop reasons (command, Remote, Local,
       // OCPP 1.6 remote/local) require a physical unplug signal and are handled
@@ -512,15 +531,195 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
       return;
     }
 
+    await this.recordUnplug(rawTransaction, unplugTime);
+  }
+
+  /**
+   * Recovers unplugs missed while the notification listener was deaf. Runs
+   * after every (re)connect of the listener.
+   *
+   * Only the newest transaction on each EVSE is considered, so a session
+   * with a newer session after it is never touched and a run is bounded by
+   * the number of EVSEs. It must be ended, not stopped by EVDisconnected,
+   * have no unplugTime yet, and its connector must now be Available since
+   * at or after its endTime. The unplug time is the first Available
+   * StatusNotification at or after endTime: the connector's own timestamp
+   * moves on if it later changed status again (e.g. Faulted -> Available),
+   * which would bill phantom parking. No such notification: skipped.
+   *
+   * Never throws; a failure on one transaction does not stop the others.
+   */
+  async catchUpMissedUnplugs(): Promise<void> {
+    if (this.unplugCatchUp) {
+      // A reconnect landed mid-run: run once more afterwards.
+      this.unplugCatchUpAgain = true;
+      return this.unplugCatchUp;
+    }
+    this.unplugCatchUp = (async () => {
+      try {
+        do {
+          this.unplugCatchUpAgain = false;
+          await this.runUnplugCatchUp();
+        } while (this.unplugCatchUpAgain);
+      } finally {
+        this.unplugCatchUp = undefined;
+      }
+    })();
+    return this.unplugCatchUp;
+  }
+
+  private async runUnplugCatchUp(): Promise<void> {
+    let candidates: UnplugCandidateTransaction[];
+    try {
+      const response = await this.ocpiGraphqlClient.request<
+        GetUnplugCatchUpCandidatesQueryResult,
+        GetUnplugCatchUpCandidatesQueryVariables
+      >(GET_UNPLUG_CATCH_UP_CANDIDATES_QUERY, {});
+      candidates = response.Evses.flatMap((evse) => evse.transactions);
+    } catch (e) {
+      this._logger.error('Unplug catch-up: candidate lookup failed', e);
+      return;
+    }
+
+    let recovered = 0;
+    for (const transaction of candidates) {
+      try {
+        if (await this.recordUnplugIfAvailable(transaction)) {
+          recovered++;
+        }
+      } catch (e) {
+        this._logger.error(
+          `Unplug catch-up failed for transaction ${transaction.id}`,
+          e,
+        );
+      }
+    }
+    this._logger.info(
+      `Unplug catch-up: checked ${candidates.length} EVSE(s), recovered ${recovered} unplug(s)`,
+    );
+  }
+
+  /**
+   * A command stop whose connector went Available before Citrine wrote the
+   * stop: the live connector handler ran while the session was still active
+   * and found nothing to record. Once the stop is fully written (stop reason
+   * known), record the unplug from the status notifications. Never throws.
+   */
+  private async recordUnplugAlreadyMissed(
+    transaction: ITransactionDto,
+  ): Promise<void> {
+    if (
+      transaction.isActive !== false ||
+      !transaction.endTime ||
+      transaction.stoppedReason == null ||
+      transaction.stoppedReason === 'EVDisconnected' ||
+      transaction.customData?.unplugTime != null
+    ) {
+      return;
+    }
+    try {
+      const response = await this.ocpiGraphqlClient.request<
+        GetUnplugCandidateByTransactionIdQueryResult,
+        GetUnplugCandidateByTransactionIdQueryVariables
+      >(GET_UNPLUG_CANDIDATE_BY_TRANSACTION_ID_QUERY, { id: transaction.id! });
+      const candidate = response.Transactions[0];
+      if (candidate) {
+        await this.recordUnplugIfAvailable(candidate);
+      }
+    } catch (e) {
+      this._logger.error(
+        `Unplug check at session end failed for transaction ${transaction.id}`,
+        e,
+      );
+    }
+  }
+
+  /**
+   * Records the unplug of an ended command-stopped transaction whose
+   * connector is Available since at or after endTime, using the first
+   * Available StatusNotification at or after endTime.
+   *
+   * @returns whether an unplug was recorded
+   */
+  private async recordUnplugIfAvailable(
+    transaction: UnplugCandidateTransaction,
+  ): Promise<boolean> {
+    const endTimeMs = this.toMs(transaction.endTime);
+    const connector = transaction.connector;
+    const connectorMs = this.toMs(connector?.timestamp);
+    if (
+      transaction.isActive !== false ||
+      endTimeMs == null ||
+      transaction.stoppedReason === 'EVDisconnected' ||
+      transaction.customData?.unplugTime != null ||
+      connector?.status !== 'Available' ||
+      connectorMs == null ||
+      connectorMs < endTimeMs
+    ) {
+      return false;
+    }
+
+    // Same OCPP EVSE id the CdrMapper uses: 2.0.1 transactions carry it on
+    // their TransactionEvents; 1.6 status notifications have no evseId and
+    // name the connector by its station-wide connectorId.
+    const ocppEvseId = transaction.transactionEvents.find(
+      (event) => event.EvseType?.id != null,
+    )?.EvseType?.id;
+    const where: StatusNotifications_Bool_Exp = {
+      stationId: { _eq: transaction.stationId },
+      connectorStatus: { _eq: 'Available' },
+      timestamp: { _gte: transaction.endTime },
+      ...(ocppEvseId != null
+        ? { evseId: { _eq: ocppEvseId } }
+        : { connectorId: { _eq: connector.connectorId } }),
+    };
+    const response = await this.ocpiGraphqlClient.request<
+      GetFirstAvailableStatusNotificationQueryResult,
+      GetFirstAvailableStatusNotificationQueryVariables
+    >(GET_FIRST_AVAILABLE_STATUS_NOTIFICATION_QUERY, { where });
+    const unplugTime = response.StatusNotifications[0]?.timestamp;
+    if (!unplugTime) {
+      this._logger.warn(
+        `No Available status notification at or after endTime ${transaction.endTime} for transaction ${transaction.id}, skipping`,
+      );
+      return false;
+    }
+
+    this._logger.info(
+      `Recording missed unplug at ${unplugTime} for transaction ${transaction.id}`,
+    );
+    return this.recordUnplug(transaction, unplugTime);
+  }
+
+  /**
+   * Records the unplug in customData, then tells partners in order: EVSE
+   * AVAILABLE, session COMPLETED, CDR. Shared by the live connector handler,
+   * the session-end handler and the reconnect catch-up.
+   *
+   * The write only applies if no unplugTime is stored yet; a caller that
+   * loses that race does nothing more, so partners hear about it once.
+   *
+   * @returns whether this call recorded the unplug
+   */
+  private async recordUnplug(
+    rawTransaction: { id: number; customData?: any },
+    unplugTime: string,
+  ): Promise<boolean> {
     // Store unplugTime so CdrMapper can compute post-session parking
     const customData = { ...(rawTransaction.customData ?? {}), unplugTime };
-    await this.ocpiGraphqlClient.request<
-      UpdateTransactionCustomDataMutationResult,
-      UpdateTransactionCustomDataMutationVariables
-    >(UPDATE_TRANSACTION_CUSTOM_DATA_MUTATION, {
+    const written = await this.ocpiGraphqlClient.request<
+      RecordTransactionUnplugTimeMutationResult,
+      RecordTransactionUnplugTimeMutationVariables
+    >(RECORD_TRANSACTION_UNPLUG_TIME_MUTATION, {
       id: rawTransaction.id,
       customData,
     });
+    if (!written.update_Transactions?.affected_rows) {
+      this._logger.debug(
+        `Unplug for transaction ${rawTransaction.id} already recorded, skipping`,
+      );
+      return false;
+    }
 
     // Broadcast AVAILABLE to all partners now so they know the charger is physically
     // free before the session COMPLETED PATCH and CDR arrive.
@@ -535,12 +734,12 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
     const fullTransaction = fullTransactionResponse.Transactions[0] as ITransactionDto | undefined;
     if (!fullTransaction) {
       this._logger.error(`Transaction ${rawTransaction.id} not found after unplug update`);
-      return;
+      return true;
     }
 
     if (!this.isReadyForCdrBroadcast(fullTransaction)) {
       this._logger.debug(`Transaction ${fullTransaction.id} still not ready for CDR after unplug`);
-      return;
+      return true;
     }
 
     // Session is now COMPLETED — send final session update before the CDR
@@ -549,5 +748,6 @@ export class SessionsModule extends AbstractDtoModule implements OcpiModule {
     }
 
     await this.cdrBroadcaster.broadcastPostCdr(fullTransaction);
+    return true;
   }
 }

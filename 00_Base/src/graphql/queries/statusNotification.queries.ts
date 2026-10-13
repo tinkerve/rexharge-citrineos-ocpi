@@ -24,3 +24,13 @@ export const GET_STATUS_NOTIFICATIONS_IN_RANGE = gql`
     }
   }
 `;
+
+export const GET_FIRST_AVAILABLE_STATUS_NOTIFICATION_QUERY = gql`
+  query GetFirstAvailableStatusNotification(
+    $where: StatusNotifications_bool_exp!
+  ) {
+    StatusNotifications(where: $where, order_by: { timestamp: asc }, limit: 1) {
+      timestamp
+    }
+  }
+`;

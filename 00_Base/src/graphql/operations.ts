@@ -73,6 +73,13 @@ export type Timestamptz_Comparison_Exp = {
   _gte?: InputMaybe<Scalars['timestamptz']['input']>;
   _lte?: InputMaybe<Scalars['timestamptz']['input']>;
 };
+export type StatusNotifications_Bool_Exp = {
+  stationId?: InputMaybe<String_Comparison_Exp>;
+  evseId?: InputMaybe<Int_Comparison_Exp>;
+  connectorId?: InputMaybe<Int_Comparison_Exp>;
+  connectorStatus?: InputMaybe<String_Comparison_Exp>;
+  timestamp?: InputMaybe<Timestamptz_Comparison_Exp>;
+};
 export type Tenants_Bool_Exp = {
   countryCode?: InputMaybe<String_Comparison_Exp>;
   partyId?: InputMaybe<String_Comparison_Exp>;
@@ -970,6 +977,53 @@ export type UpdateTransactionCustomDataMutationResult = {
   } | null;
 };
 
+export type GetUnplugCatchUpCandidatesQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetUnplugCatchUpCandidatesQueryResult = {
+  Evses: Array<{
+    id: number;
+    transactions: Array<{
+      id: number;
+      stationId: string;
+      evseId?: number | null;
+      locationId?: number | null;
+      isActive?: boolean | null;
+      endTime?: any | null;
+      stoppedReason?: string | null;
+      customData?: any | null;
+      tenant: { countryCode?: any | null; partyId?: string | null };
+      transactionEvents: Array<{ EvseType?: { id: number } | null }>;
+      connector?: {
+        connectorId: number;
+        status?: string | null;
+        timestamp?: any | null;
+      } | null;
+    }>;
+  }>;
+};
+
+export type UnplugCandidateTransaction =
+  GetUnplugCatchUpCandidatesQueryResult['Evses'][number]['transactions'][number];
+
+export type GetUnplugCandidateByTransactionIdQueryVariables = Exact<{
+  id: Scalars['Int']['input'];
+}>;
+
+export type GetUnplugCandidateByTransactionIdQueryResult = {
+  Transactions: Array<UnplugCandidateTransaction>;
+};
+
+export type RecordTransactionUnplugTimeMutationVariables = Exact<{
+  id: Scalars['Int']['input'];
+  customData: Scalars['jsonb']['input'];
+}>;
+
+export type RecordTransactionUnplugTimeMutationResult = {
+  update_Transactions?: { affected_rows: number } | null;
+};
+
 export type GetRecentlyEndedTransactionByEvseQueryVariables = Exact<{
   evseId: Scalars['Int']['input'];
   stationId: Scalars['String']['input'];
@@ -1114,6 +1168,16 @@ export type GetTransactionByTransactionIdQueryResult = {
       timestamp?: any | null;
       sampledValue?: any | null;
     }>;
+  }>;
+};
+
+export type GetFirstAvailableStatusNotificationQueryVariables = Exact<{
+  where: StatusNotifications_Bool_Exp;
+}>;
+
+export type GetFirstAvailableStatusNotificationQueryResult = {
+  StatusNotifications: Array<{
+    timestamp?: any | null;
   }>;
 };
 

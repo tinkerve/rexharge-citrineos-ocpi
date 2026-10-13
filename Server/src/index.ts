@@ -180,6 +180,10 @@ export class CitrineOSServer {
         );
       }
     }
+    // Every channel is LISTENed now. Recover unplugs missed before this
+    // connect (a deploy is a reconnect too) and after every reconnect.
+    const sessionsModule = Container.get(SessionsModule);
+    dtoRouter.onConnected(() => sessionsModule.catchUpMissedUnplugs());
   }
 }
 

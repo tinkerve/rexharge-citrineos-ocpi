@@ -53,6 +53,7 @@
     "lodash.startcase": "4.4.0",
     "node-pg-migrate": "^7.9.1",
     "pg": "8.11.3",
+    "pg-listen": "1.7.0",
     "reflect-metadata": "0.1.13",
     "routing-controllers": "0.10.4",
     "tslog": "4.9.2",
