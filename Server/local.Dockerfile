@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM node:22 AS build
+FROM --platform=$BUILDPLATFORM node:22.23.4-alpine AS build
 
 WORKDIR /usr/local/apps
 
@@ -20,8 +20,8 @@ RUN npm run install-all
 RUN npm run build
 
 # The final stage, which copies built files and prepares the run environment
-# Using alpine image to reduce the final image size
-FROM --platform=$BUILDPLATFORM node:22-alpine
+# Alpine in both stages so native modules are installed for musl
+FROM --platform=$BUILDPLATFORM node:22.23.4-alpine
 COPY --from=build /usr/local/apps /usr/local/apps
 
 WORKDIR /usr/local/apps/citrineos-ocpi

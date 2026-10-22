@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM node:22 AS build
+FROM --platform=$BUILDPLATFORM node:22.23.4-alpine AS build
 
 WORKDIR /usr/local/apps/citrineos-ocpi
 
@@ -15,8 +15,8 @@ RUN npx tsc --build ./citrineos-core/02_Util/tsconfig.json
 RUN npm run build
 
 # The final stage, which copies built files and prepares the run environment
-# Using alpine image to reduce the final image size
-FROM --platform=$BUILDPLATFORM node:22-alpine
+# Alpine in both stages so native modules are installed for musl
+FROM --platform=$BUILDPLATFORM node:22.23.4-alpine
 COPY --from=build /usr/local/apps/citrineos-ocpi /usr/local/apps/citrineos-ocpi
 
 WORKDIR /usr/local/apps/citrineos-ocpi
