@@ -96,16 +96,21 @@ export class CredentialsService {
     if (partner.partnerProfileOCPI?.credentials?.token) {
       throw new AlreadyRegisteredException();
     }
+    // The partner picks the version from our versions list, so any version we
+    // advertise is theirs to choose. The one stored when our setup token was
+    // issued is only a default; after a reset it may be one they do not speak.
+    const advertised = (partner.tenant?.serverProfileOCPI?.versionDetails ??
+      []) as Array<{ version: string }>;
     if (
-      versionNumber !==
-      RegistrationMapper.toVersionNumber(
-        partner.partnerProfileOCPI!.version.version,
+      !advertised.some(
+        (v) => RegistrationMapper.toVersionNumber(v.version) === versionNumber,
       )
     ) {
-      throw new NotFoundError(
-        `TenantPartner expects ${partner.partnerProfileOCPI!.version.version}, received ${versionNumber}`,
-      );
+      throw new NotFoundError(`OCPI ${versionNumber} is not offered`);
     }
+    partner.partnerProfileOCPI!.version = {
+      version: RegistrationMapper.toOCPIVersionNumber(versionNumber),
+    };
     const tenantPartner = await this.getVersionDetails(
       partner,
       credentials.url,
