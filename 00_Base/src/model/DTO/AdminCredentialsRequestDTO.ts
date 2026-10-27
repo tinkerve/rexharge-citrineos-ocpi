@@ -7,7 +7,9 @@ import { CredentialsRoleDTOSchema } from './CredentialsRoleDTO';
 import { CountryCode } from '../../util/Util';
 
 export const AdminCredentialsRequestDTOSchema = z.object({
-  url: z.string().url(),
+  // Our versions URL. Optional: derived from registration.publicBaseUrl when
+  // absent, so it is only given for a partner that must reach us elsewhere.
+  url: z.string().url().optional(),
   role: CredentialsRoleDTOSchema,
   mspCountryCode: z.nativeEnum(CountryCode),
   mspPartyId: z.string(),

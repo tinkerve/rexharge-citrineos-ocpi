@@ -7,13 +7,11 @@ import {
   OCPIRegistration,
   OCPIVersionNumber,
 } from '@citrineos/base';
-import {
-  CredentialsDTO,
-  ImageCategory,
-  ImageType,
-  Role,
-  VersionNumber,
-} from '..';
+import { CredentialsDTO } from '../model/DTO/CredentialsDTO';
+import { ImageCategory } from '../model/ImageCategory';
+import { ImageType } from '../model/ImageType';
+import { Role } from '../model/Role';
+import { VersionNumber } from '../model/VersionNumber';
 import { EndpointIdentifier } from '../model/EndpointIdentifier';
 import { Endpoint } from '../model/Endpoint';
 import { InterfaceRole } from '../model/InterfaceRole';
@@ -28,7 +26,12 @@ export class RegistrationMapper {
   ): CredentialsDTO {
     const partnerProfile = partner.partnerProfileOCPI!;
     const tenant = partner.tenant!;
-    const serverProfile = tenant.serverProfileOCPI!;
+    const serverProfile = tenant.serverProfileOCPI;
+    if (!serverProfile?.credentialsRole) {
+      throw new Error(
+        `Tenant ${tenant.id} has no OCPI server profile (credentials role); set it before registering partners`,
+      );
+    }
     return {
       token: partnerProfile.serverCredentials.token!,
       url: partnerProfile.serverCredentials.versionsUrl,

@@ -234,6 +234,7 @@ export { WrongClientAccessException } from './exception/WrongClientAccessExcepti
 export { ChargingProfilesService } from './services/ChargingProfilesService';
 // export { AsyncResponder } from './util/AsyncResponder';
 export { AsAdminEndpoint } from './util/decorators/AsAdminEndpoint';
+export { AsRegistrationAdminEndpoint } from './util/decorators/AsRegistrationAdminEndpoint';
 
 export { MessageSenderWrapper } from './util/MessageSenderWrapper';
 export { MessageHandlerWrapper } from './util/MessageHandlerWrapper';
@@ -265,6 +266,10 @@ export { LocationsClientApi } from './trigger/LocationsClientApi';
 
 export { CommandsService } from './services/CommandsService';
 export { CredentialsService } from './services/CredentialsService';
+export {
+  RegistrationHandshake,
+  ResetOutcome,
+} from './services/RegistrationHandshake';
 export { TokensService } from './services/TokensService';
 // export { TokensAdminService } from './services/TokensAdminService';
 export { LocationsService } from './services/LocationsService';

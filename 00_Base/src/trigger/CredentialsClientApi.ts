@@ -15,7 +15,7 @@ import {
 } from '../model/OcpiEmptyResponse';
 import { HttpMethod, OCPIRegistration } from '@citrineos/base';
 import { EndpointIdentifier } from '../model/EndpointIdentifier';
-import { CredentialsDTO } from '..';
+import { CredentialsDTO } from '../model/DTO/CredentialsDTO';
 
 @Service()
 export class CredentialsClientApi extends BaseClientApi {

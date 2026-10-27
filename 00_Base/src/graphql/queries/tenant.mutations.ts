@@ -39,6 +39,17 @@ export const UPDATE_TENANT_PARTNER_PROFILE = gql`
   }
 `;
 
+export const CLEAR_TENANT_PARTNER_PROFILE = gql`
+  mutation ClearTenantPartnerProfile($partnerId: Int!) {
+    update_TenantPartners(
+      where: { id: { _eq: $partnerId } }
+      _set: { partnerProfileOCPI: null }
+    ) {
+      affected_rows
+    }
+  }
+`;
+
 export const DELETE_TENANT_PARTNER_BY_ID = gql`
   mutation DeleteTenantPartnerById($id: Int!) {
     delete_TenantPartners(where: { id: { _eq: $id } }) {

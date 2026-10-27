@@ -4,7 +4,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { Service } from 'typedi';
-import { InternalServerError, NotFoundError } from 'routing-controllers';
+import { NotFoundError } from 'routing-controllers';
 import { OcpiLogger } from '../util/OcpiLogger';
 import { VersionNumber } from '../model/VersionNumber';
 import { VersionsClientApi } from '../trigger/VersionsClientApi';
@@ -20,7 +20,6 @@ import {
   UPDATE_TENANT_PARTNER_PROFILE,
 } from '../graphql/queries/tenant.mutations';
 import { UnregisterClientRequestDTO } from '../model/UnregisterClientRequestDTO';
-import { AdminCredentialsRequestDTO } from '../model/DTO/AdminCredentialsRequestDTO';
 import {
   DELETE_TENANT_PARTNER_BY_SERVER_TOKEN,
   GET_TENANT_PARTNER_BY_CPO_AND_AND_CLIENT,
@@ -92,7 +91,9 @@ export class CredentialsService {
     credentials: CredentialsDTO,
     versionNumber: VersionNumber,
   ): Promise<CredentialsDTO> {
-    if (partner.partnerProfileOCPI?.credentials) {
+    // A token, not merely the object: the old partner form wrote an empty
+    // credentials object that would otherwise turn every partner away.
+    if (partner.partnerProfileOCPI?.credentials?.token) {
       throw new AlreadyRegisteredException();
     }
     if (
@@ -171,151 +172,6 @@ export class CredentialsService {
     if (!response.delete_TenantPartners?.affected_rows) {
       throw new NotFoundError(
         'No client information found for the provided token',
-      );
-    }
-  }
-
-  async registerCredentialsTokenA(
-    cpoCountryCode: string,
-    cpoPartyId: string,
-    versionsUrl: string,
-    credentials: CredentialsDTO,
-    versionNumber: VersionNumber,
-  ): Promise<CredentialsDTO> {
-    const { url, token: credentialsTokenA, roles } = credentials;
-    const partnerRole = roles[0];
-    const response = await this.ocpiGraphqlClient.request<
-      GetTenantPartnerByCpoClientAndModuleIdQueryResult,
-      GetTenantPartnerByCpoClientAndModuleIdQueryVariables
-    >(GET_TENANT_PARTNER_BY_CPO_AND_AND_CLIENT, {
-      cpoCountryCode: cpoCountryCode,
-      cpoPartyId: cpoPartyId,
-      clientCountryCode: partnerRole.country_code,
-      clientPartyId: partnerRole.party_id,
-    });
-    let tenantPartner = response.TenantPartners[0] as ITenantPartnerDto;
-    if (tenantPartner.partnerProfileOCPI?.serverCredentials) {
-      throw new AlreadyRegisteredException();
-    }
-    if (
-      versionNumber !==
-      RegistrationMapper.toVersionNumber(
-        tenantPartner.partnerProfileOCPI!.version.version,
-      )
-    ) {
-      throw new NotFoundError(
-        `TenantPartner expects ${tenantPartner.partnerProfileOCPI!.version.version}, received ${versionNumber}`,
-      );
-    }
-    tenantPartner.partnerProfileOCPI!.credentials = {
-      versionsUrl: url,
-      token: credentialsTokenA,
-    };
-    tenantPartner.partnerProfileOCPI!.roles = roles.map(
-      (value: CredentialsRoleDTO) =>
-        RegistrationMapper.toCredentialsRole(value),
-    );
-    tenantPartner = await this.getVersionDetails(
-      tenantPartner,
-      url,
-      credentialsTokenA,
-    );
-
-    const credentialsTokenB = uuidv4();
-    tenantPartner.partnerProfileOCPI!.serverCredentials = {
-      versionsUrl,
-      token: credentialsTokenB,
-    };
-
-    await this.ocpiGraphqlClient.request<
-      UpdateTenantPartnerProfileMutationResult,
-      UpdateTenantPartnerProfileMutationVariables
-    >(UPDATE_TENANT_PARTNER_PROFILE, {
-      partnerId: tenantPartner.id!,
-      input: tenantPartner.partnerProfileOCPI!,
-    });
-
-    const credentialsResponse = await this.credentialsClientApi.postCredentials(
-      cpoCountryCode,
-      cpoPartyId,
-      tenantPartner.countryCode!,
-      tenantPartner.partyId!,
-      tenantPartner.partnerProfileOCPI!,
-      RegistrationMapper.tenantPartnerToCredentialsDto(tenantPartner),
-      credentialsTokenA,
-    );
-    return credentialsResponse.data as CredentialsDTO;
-  }
-
-  async regenerateCredentialsToken(
-    credentialsRequest: AdminCredentialsRequestDTO,
-    versionNumber: VersionNumber,
-  ): Promise<CredentialsDTO> {
-    try {
-      const response = await this.ocpiGraphqlClient.request<
-        GetTenantPartnerByCpoClientAndModuleIdQueryResult,
-        GetTenantPartnerByCpoClientAndModuleIdQueryVariables
-      >(GET_TENANT_PARTNER_BY_CPO_AND_AND_CLIENT, {
-        cpoCountryCode: credentialsRequest.role.country_code,
-        cpoPartyId: credentialsRequest.role.party_id,
-        clientCountryCode: credentialsRequest.mspCountryCode,
-        clientPartyId: credentialsRequest.mspPartyId,
-      });
-      const tenantPartner = response.TenantPartners[0] as ITenantPartnerDto;
-      const newCredentialsToken = uuidv4();
-      tenantPartner.partnerProfileOCPI!.serverCredentials.versionsUrl =
-        credentialsRequest.url;
-      tenantPartner.partnerProfileOCPI!.serverCredentials.token =
-        newCredentialsToken;
-      tenantPartner.partnerProfileOCPI!.version.version =
-        RegistrationMapper.toOCPIVersionNumber(versionNumber);
-      const newCredentialsDto =
-        RegistrationMapper.tenantPartnerToCredentialsDto(tenantPartner);
-
-      // OCPI 2.2.1 section 1.1.4: the PUT must be authenticated with the token
-      // the partner previously issued to us (TOKEN_C, held in
-      // partnerProfile.credentials.token). The new token we want them to start
-      // using travels in the body, not the Authorization header. Passing
-      // serverCredentials.token here sent them a token they had never issued,
-      // which they correctly rejected with 401 "Platform not found".
-      //
-      // No overrideToken, so getHeaders() falls back to credentials.token.
-      const putCredentialsResponse =
-        await this.credentialsClientApi.putCredentials(
-          credentialsRequest.role.country_code,
-          credentialsRequest.role.party_id,
-          credentialsRequest.mspCountryCode,
-          credentialsRequest.mspPartyId,
-          tenantPartner.partnerProfileOCPI!,
-          newCredentialsDto,
-        );
-
-      tenantPartner.partnerProfileOCPI!.credentials = {
-        versionsUrl: putCredentialsResponse!.data!.url!,
-        token: putCredentialsResponse?.data?.token,
-      };
-      tenantPartner.partnerProfileOCPI!.roles =
-        putCredentialsResponse?.data?.roles.map((value: CredentialsRoleDTO) =>
-          RegistrationMapper.toCredentialsRole(value),
-        );
-
-      // Single write, only once the partner has accepted and its response has
-      // been parsed. Persisting the rotated token before the call meant a
-      // rejected handshake left us expecting a token the partner had never
-      // received, breaking every inbound request they made.
-      await this.ocpiGraphqlClient.request<
-        UpdateTenantPartnerProfileMutationResult,
-        UpdateTenantPartnerProfileMutationVariables
-      >(UPDATE_TENANT_PARTNER_PROFILE, {
-        partnerId: tenantPartner.id!,
-        input: tenantPartner.partnerProfileOCPI!,
-      });
-
-      return newCredentialsDto;
-    } catch (error) {
-      this.logger.error('Regenerate credentials token failed, ', error);
-      throw new InternalServerError(
-        `Regenerate credentials token failed, ${JSON.stringify(error)}`,
       );
     }
   }
@@ -415,47 +271,5 @@ export class CredentialsService {
     await this.ocpiGraphqlClient.request(DELETE_TENANT_PARTNER_BY_ID, {
       id: tenantPartner.id,
     });
-  }
-
-  async generateCredentialsTokenA(
-    credentialsRequest: AdminCredentialsRequestDTO,
-    versionNumber: VersionNumber,
-  ): Promise<CredentialsDTO> {
-    const response = await this.ocpiGraphqlClient.request<
-      GetTenantPartnerByCpoClientAndModuleIdQueryResult,
-      GetTenantPartnerByCpoClientAndModuleIdQueryVariables
-    >(GET_TENANT_PARTNER_BY_CPO_AND_AND_CLIENT, {
-      cpoCountryCode: credentialsRequest.role.country_code,
-      cpoPartyId: credentialsRequest.role.party_id,
-      clientCountryCode: credentialsRequest.mspCountryCode,
-      clientPartyId: credentialsRequest.mspPartyId,
-    });
-    const tenantPartner = response.TenantPartners[0] as ITenantPartnerDto;
-    if (tenantPartner.partnerProfileOCPI) {
-      throw new Error(
-        `TenantPartner already has credentials token A: ${JSON.stringify(tenantPartner.partnerProfileOCPI)}`,
-      );
-    }
-
-    const credentialsTokenA = uuidv4();
-    tenantPartner.partnerProfileOCPI = {
-      serverCredentials: {
-        versionsUrl: credentialsRequest.url,
-        token: credentialsTokenA,
-      },
-      version: {
-        version: RegistrationMapper.toOCPIVersionNumber(versionNumber),
-      },
-    };
-
-    await this.ocpiGraphqlClient.request<
-      UpdateTenantPartnerProfileMutationResult,
-      UpdateTenantPartnerProfileMutationVariables
-    >(UPDATE_TENANT_PARTNER_PROFILE, {
-      partnerId: tenantPartner.id!,
-      input: tenantPartner.partnerProfileOCPI!,
-    });
-
-    return RegistrationMapper.tenantPartnerToCredentialsDto(tenantPartner);
   }
 }

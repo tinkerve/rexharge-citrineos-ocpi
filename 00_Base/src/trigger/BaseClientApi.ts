@@ -233,6 +233,9 @@ export abstract class BaseClientApi {
     const startedAt = Date.now();
     let rawResponse: IRestResponse<unknown> | undefined;
     let responseForLog: IRestResponse<unknown> | undefined;
+    // A credentials exchange carries live tokens in both directions.
+    const loggedBody =
+      ocpiModuleOf(effectiveUrl) === 'credentials' ? '[credentials]' : body;
 
     try {
       switch (httpMethod) {
@@ -241,15 +244,24 @@ export abstract class BaseClientApi {
           rawResponse = await this.getRaw(effectiveUrl, options);
           break;
         case HttpMethod.Post:
-          this.logger.debug(`Sending POST request to ${effectiveUrl}`, body);
+          this.logger.debug(
+            `Sending POST request to ${effectiveUrl}`,
+            loggedBody,
+          );
           rawResponse = await this.createRaw(effectiveUrl, body, options);
           break;
         case HttpMethod.Put:
-          this.logger.debug(`Sending PUT request to ${effectiveUrl}`, body);
+          this.logger.debug(
+            `Sending PUT request to ${effectiveUrl}`,
+            loggedBody,
+          );
           rawResponse = await this.replaceRaw(effectiveUrl, body, options);
           break;
         case HttpMethod.Patch:
-          this.logger.debug(`Sending PATCH request to ${effectiveUrl}`, body);
+          this.logger.debug(
+            `Sending PATCH request to ${effectiveUrl}`,
+            loggedBody,
+          );
           rawResponse = await this.updateRaw(effectiveUrl, body, options);
           break;
         case HttpMethod.Delete:
@@ -261,7 +273,11 @@ export abstract class BaseClientApi {
       if (requestLoggingEnabled) {
         responseForLog = this.snapshotResponse(rawResponse!);
       }
-      const parsedResponse = this.handleResponse(schema, rawResponse!);
+      const parsedResponse = this.handleResponse(
+        schema,
+        rawResponse!,
+        loggedBody !== body,
+      );
       if (requestLoggingEnabled) {
         this.forwardRequestLog({
           fromCountryCode,
@@ -279,6 +295,7 @@ export abstract class BaseClientApi {
       }
       return parsedResponse;
     } catch (error) {
+      this.warnOnAuthRejection(error, toCountryCode, toPartyId, effectiveUrl);
       if (requestLoggingEnabled) {
         const errorResponse =
           error instanceof UnsuccessfulRequestException && error.iRestResponse
@@ -487,9 +504,32 @@ export abstract class BaseClientApi {
     return { successes, failures };
   }
 
+  /**
+   * A partner refusing our credentials is worth finding later: registration
+   * state does not gate outbound traffic, so a broken partnership keeps
+   * being called. One greppable line — partner, module, status — and never
+   * the URL's query or any header, which can carry credentials.
+   */
+  private warnOnAuthRejection(
+    error: unknown,
+    toCountryCode: string,
+    toPartyId: string,
+    url: string,
+  ): void {
+    const status =
+      error instanceof UnsuccessfulRequestException
+        ? error.iRestResponse?.statusCode
+        : (error as any)?.statusCode;
+    if (status !== 401 && status !== 403) return;
+    this.logger.warn(
+      `OCPI outbound auth rejected: partner=${toCountryCode}/${toPartyId} module=${ocpiModuleOf(url)} status=${status}`,
+    );
+  }
+
   protected handleResponse<T extends ZodTypeAny>(
     schema: T,
     response: IRestResponse<unknown>,
+    quiet = false,
   ): T {
     if (response.statusCode >= 200 && response.statusCode <= 299) {
       const result = response.result;
@@ -523,7 +563,7 @@ export abstract class BaseClientApi {
         }
       }
 
-      this.logger.debug('Response received:', result);
+      this.logger.debug('Response received:', quiet ? '[credentials]' : result);
       // Parse and validate using Zod
       return schema.parse(result);
     } else {
@@ -588,5 +628,28 @@ export abstract class BaseClientApi {
     };
 
     void this.ocpiRequestLogClient.send(payload);
+  }
+}
+
+const OCPI_MODULES = new Set([
+  'cdrs',
+  'chargingprofiles',
+  'commands',
+  'credentials',
+  'hubclientinfo',
+  'locations',
+  'sessions',
+  'tariffs',
+  'tokens',
+  'versions',
+]);
+
+/** The OCPI module a partner URL addresses, read from its path only. */
+function ocpiModuleOf(url: string): string {
+  try {
+    const segments = new URL(url).pathname.toLowerCase().split('/');
+    return segments.find((segment) => OCPI_MODULES.has(segment)) ?? 'unknown';
+  } catch {
+    return 'unknown';
   }
 }

@@ -7,6 +7,7 @@ import {
   AdminCredentialsRequestDTOSchema,
   AdminCredentialsRequestDTOSchemaName,
   AsOcpiRegistrationEndpoint,
+  AsRegistrationAdminEndpoint,
   AuthToken,
   BaseController,
   BodyWithSchema,
@@ -26,6 +27,9 @@ import {
   OcpiEmptyResponseSchemaName,
   OcpiLogger,
   OcpiResponseStatusCode,
+  RegistrationHandshake,
+  RegistrationMapper,
+  ResetOutcome,
   ResponseSchema,
   UnregisterClientRequestDTO,
   UnregisterClientRequestDTOSchema,
@@ -67,6 +71,7 @@ export class CredentialsModuleApi
   constructor(
     readonly logger: OcpiLogger,
     readonly credentialsService: CredentialsService,
+    readonly registrationHandshake: RegistrationHandshake,
   ) {
     super();
   }
@@ -180,8 +185,8 @@ export class CredentialsModuleApi
    * and register token B and C.
    */
   @Post('/register-credentials-token-a')
-  // @AsAdminEndpoint()
-  @ResponseSchema(CredentialsResponseSchema, CredentialsResponseSchemaName, {
+  @AsRegistrationAdminEndpoint()
+  @ResponseSchema(OcpiEmptyResponseSchema, OcpiEmptyResponseSchemaName, {
     statusCode: HttpStatus.OK,
     description: 'Successful response',
     examples: {
@@ -193,26 +198,34 @@ export class CredentialsModuleApi
   })
   async registerCredentialsTokenA(
     @VersionNumberParam() versionNumber: VersionNumber,
-    @QueryParam('versionUrl') versionUrl: string, // CPO version url
+    @QueryParam('versionUrl') versionUrl: string | undefined, // our versions URL; derived when absent
     @QueryParam('cpoCountryCode') cpoCountryCode: string,
     @QueryParam('cpoPartyId') cpoPartyId: string,
     @BodyWithSchema(CredentialsDTOSchema, CredentialsDTOSchemaName)
-    credentials: CredentialsDTO, // Partner credentials
-  ): Promise<CredentialsResponse> {
-    this.logger.info('registerCredentialsTokenA', credentials);
-    const serverCredentials: CredentialsDTO =
-      await this.credentialsService?.registerCredentialsTokenA(
+    credentials: CredentialsDTO, // the partner's setup token, versions URL and roles
+  ): Promise<OcpiEmptyResponse> {
+    const partnerRole = credentials.roles[0];
+    // Never log the partner's setup token.
+    this.logger.info('registerCredentialsTokenA', {
+      partner: `${partnerRole.country_code}/${partnerRole.party_id}`,
+      url: credentials.url,
+    });
+    await this.registrationHandshake.completeFromPartnerToken(
+      {
         cpoCountryCode,
         cpoPartyId,
-        versionUrl,
-        credentials,
-        versionNumber,
-      );
-    return buildCredentialsResponse(serverCredentials);
+        mspCountryCode: partnerRole.country_code,
+        mspPartyId: partnerRole.party_id,
+      },
+      { token: credentials.token, url: credentials.url },
+      versionNumber,
+      versionUrl || undefined,
+    );
+    return buildOcpiEmptyResponse(OcpiResponseStatusCode.GenericSuccessCode);
   }
 
   @Delete('/delete-tenant/:tenantId')
-  // @AsAdminEndpoint()
+  @AsRegistrationAdminEndpoint()
   @ResponseSchema(OcpiEmptyResponseSchema, OcpiEmptyResponseSchemaName, {
     description: 'Successful response',
     examples: {
@@ -234,7 +247,7 @@ export class CredentialsModuleApi
 
   @Delete('/unregister-client')
   @OnUndefined(HttpStatus.NO_CONTENT)
-  // @AsAdminEndpoint()
+  @AsRegistrationAdminEndpoint()
   async unregisterClient(
     @VersionNumberParam() versionNumber: VersionNumber,
     @BodyWithSchema(
@@ -256,7 +269,7 @@ export class CredentialsModuleApi
    * @param credentialsRequest AdminCredentialsRequestDTO including version url and server credentials roles
    */
   @Post('/generate-credentials-token-a')
-  // @AsAdminEndpoint()
+  @AsRegistrationAdminEndpoint()
   @ResponseSchema(CredentialsResponseSchema, CredentialsResponseSchemaName, {
     statusCode: HttpStatus.OK,
     description: 'Successful response',
@@ -277,18 +290,64 @@ export class CredentialsModuleApi
   ): Promise<CredentialsResponse> {
     this.logger.info('generateCredentialsTokenA', credentialsRequest);
 
-    const createdCredentials: CredentialsDTO =
-      await this.credentialsService?.generateCredentialsTokenA(
-        credentialsRequest,
-        versionNumber,
-      );
+    const issued = await this.registrationHandshake.issueSetupToken(
+      toPartnerIdentity(credentialsRequest),
+      versionNumber,
+      credentialsRequest.url,
+    );
 
-    return buildCredentialsResponse(createdCredentials);
+    return buildCredentialsResponse(
+      RegistrationMapper.tenantPartnerToCredentialsDto(issued.partner),
+    );
   }
 
+  /**
+   * Withdraws a setup token issued by generate-credentials-token-a that the
+   * partner has not used yet, so a token sent in error stops working.
+   */
+  @Post('/cancel-credentials-token-a')
+  @OnUndefined(HttpStatus.NO_CONTENT)
+  @AsRegistrationAdminEndpoint()
+  async cancelCredentialsTokenA(
+    @VersionNumberParam() _versionNumber: VersionNumber,
+    @BodyWithSchema(
+      AdminCredentialsRequestDTOSchema,
+      AdminCredentialsRequestDTOSchemaName,
+    )
+    credentialsRequest: AdminCredentialsRequestDTO,
+  ): Promise<void> {
+    this.logger.info('cancelCredentialsTokenA', credentialsRequest);
+    await this.registrationHandshake.cancelSetupToken(
+      toPartnerIdentity(credentialsRequest),
+    );
+  }
+
+  /**
+   * Puts a partnership back to "not started" on the same partner record:
+   * tells the partner (best effort), then clears its OCPI profile. Driver
+   * authorizations are untouched. Answers how telling the partner went.
+   */
+  @Post('/reset-registration')
+  @AsRegistrationAdminEndpoint()
+  async resetRegistration(
+    @VersionNumberParam() _versionNumber: VersionNumber,
+    @BodyWithSchema(
+      AdminCredentialsRequestDTOSchema,
+      AdminCredentialsRequestDTOSchemaName,
+    )
+    request: AdminCredentialsRequestDTO,
+  ): Promise<ResetOutcome> {
+    this.logger.info('resetRegistration', request);
+    return this.registrationHandshake.reset(toPartnerIdentity(request));
+  }
+
+  /**
+   * Re-keys a registered partnership in place. A rejected rotation leaves the
+   * previous credentials in force and answers 502 with a redacted reason.
+   */
   @Put('/regenerate-credentials-token')
-  // @AsAdminEndpoint()
-  @ResponseSchema(CredentialsResponseSchema, CredentialsResponseSchemaName, {
+  @AsRegistrationAdminEndpoint()
+  @ResponseSchema(OcpiEmptyResponseSchema, OcpiEmptyResponseSchemaName, {
     statusCode: HttpStatus.OK,
     description: 'Successful response',
     examples: {
@@ -299,21 +358,26 @@ export class CredentialsModuleApi
     },
   })
   async regenerateCredentialsToken(
-    @VersionNumberParam() versionNumber: VersionNumber,
+    @VersionNumberParam() _versionNumber: VersionNumber,
     @BodyWithSchema(
       AdminCredentialsRequestDTOSchema,
       AdminCredentialsRequestDTOSchemaName,
     )
     credentialsRequest: AdminCredentialsRequestDTO,
-  ): Promise<CredentialsResponse> {
+  ): Promise<OcpiEmptyResponse> {
     this.logger.info('regenerateCredentialsToken', credentialsRequest);
-
-    const createdCredentials: CredentialsDTO =
-      await this.credentialsService?.regenerateCredentialsToken(
-        credentialsRequest,
-        versionNumber,
-      );
-
-    return buildCredentialsResponse(createdCredentials);
+    await this.registrationHandshake.rotate(
+      toPartnerIdentity(credentialsRequest),
+    );
+    return buildOcpiEmptyResponse(OcpiResponseStatusCode.GenericSuccessCode);
   }
+}
+
+function toPartnerIdentity(request: AdminCredentialsRequestDTO) {
+  return {
+    cpoCountryCode: request.role.country_code,
+    cpoPartyId: request.role.party_id,
+    mspCountryCode: request.mspCountryCode,
+    mspPartyId: request.mspPartyId,
+  };
 }

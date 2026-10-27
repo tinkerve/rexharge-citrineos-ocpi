@@ -187,6 +187,17 @@ export const ocpiConfigInputSchema = z.object({
   defaultPageLimit: z.number().int().positive().default(50).optional(),
   maxPageLimit: z.number().int().positive().default(1000).optional(),
 
+  // Partner registration admin routes. Without an adminApiKey those routes
+  // refuse every caller. publicBaseUrl is the base partners reach us on; our
+  // versions URL is derived from it.
+  registration: z
+    .object({
+      adminApiKey: z.string().optional(),
+      publicBaseUrl: z.string().url().optional(),
+    })
+    .default({})
+    .optional(),
+
   // Optional OIDC configuration
   oidc: oidcConfigSchema,
 });
@@ -383,6 +394,12 @@ export const ocpiConfigSchema = z.object({
   logLevel: z.number().min(0).max(6),
   defaultPageLimit: z.number().int().positive(),
   maxPageLimit: z.number().int().positive(),
+  registration: z
+    .object({
+      adminApiKey: z.string().optional(),
+      publicBaseUrl: z.string().url().optional(),
+    })
+    .default({}),
   oidc: oidcConfigSchema,
 });
 

@@ -2,7 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { KoaMiddlewareInterface, NotFoundError, UnauthorizedError } from 'routing-controllers';
+import {
+  KoaMiddlewareInterface,
+  NotFoundError,
+  UnauthorizedError,
+} from 'routing-controllers';
 import { Context } from 'vm';
 import { Service } from 'typedi';
 import { HttpStatus, UnauthorizedException } from '@citrineos/base';
@@ -15,8 +19,9 @@ import { InvalidParamException } from '../../exception/InvalidParamException';
 import { UnsuccessfulRequestException } from '../../exception/UnsuccessfulRequestException';
 import { NotFoundException } from '../../exception/NotFoundException';
 import { ContentType } from '../ContentType';
+import { RegistrationHandshakeException } from '../../exception/RegistrationHandshakeException';
 
-class HttpExceptionBody {
+export class HttpExceptionBody {
   message?: string;
 
   constructor(message?: string) {
@@ -82,6 +87,13 @@ export class HttpExceptionHandler implements KoaMiddlewareInterface {
             context.status = HttpStatus.BAD_REQUEST;
             context.body = JSON.stringify(
               new HttpExceptionBody((err as any).message),
+            );
+            break;
+          case RegistrationHandshakeException.name:
+            // Already redacted; safe to return as-is.
+            context.status = HttpStatus.BAD_GATEWAY;
+            context.body = JSON.stringify(
+              new HttpExceptionBody((err as Error).message),
             );
             break;
           case UnsuccessfulRequestException.name:

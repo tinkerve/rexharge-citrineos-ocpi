@@ -101,6 +101,11 @@ export function createLocalOcpiConfig(): OcpiConfigInput {
       timeoutMs: parseInt(process.env.OCPI_REQUEST_LOG_TIMEOUT_MS || '2000'),
     },
 
+    registration: {
+      adminApiKey: process.env.OCPI_REGISTRATION_ADMIN_API_KEY || undefined,
+      publicBaseUrl: process.env.OCPI_PUBLIC_BASE_URL || undefined,
+    },
+
     messageBroker: {
       amqp: {
         url: process.env.AMQP_URL || 'amqp://guest:guest@localhost:5672',
